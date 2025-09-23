@@ -6,21 +6,21 @@ import { ChatMessage } from '../types';
 // 2. Login with your wallet.
 // 3. Go to "API Key" on the left menu.
 // 4. Create a new API key and paste it here.
-const LIGHTHOUSE_API_KEY = "5b53c99a.4a6c9fe6c44c4131b4700bcbc43904a3";
+// FIX: Explicitly type the API key as a string to allow the placeholder check below,
+// preventing a TypeScript error about non-overlapping types.
+const LIGHTHOUSE_API_KEY: string = "5b53c99a.4a6c9fe6c44c4131b4700bcbc43904a3";
 
 // Note: This filename is a remnant of a previous implementation.
 // This service now exclusively uses Lighthouse.storage.
 
 export const uploadChatHistory = async (messages: ChatMessage[]): Promise<string | null> => {
-    // FIX: This comparison was causing a TypeScript error because LIGHTHOUSE_API_KEY is a const
-    // with a specific value, so it can never equal the placeholder string. The check has been removed.
-    if (!LIGHTHOUSE_API_KEY) {
+    if (!LIGHTHOUSE_API_KEY || LIGHTHOUSE_API_KEY === "PASTE_YOUR_LIGHTHOUSE_API_KEY_HERE") {
         console.error("Lighthouse API key is not set. Please add it to `services/web3storageService.ts`.");
         return null;
     }
 
     try {
-        const data = JSON.stringify({
+        const chatData = JSON.stringify({
             version: 1,
             createdAt: new Date().toISOString(),
             messages: messages,
@@ -28,26 +28,11 @@ export const uploadChatHistory = async (messages: ChatMessage[]): Promise<string
 
         const fileName = `aura-chat-${new Date().getTime()}.json`;
 
-        // The Lighthouse SDK for browser needs the data as a Blob
-        const blob = new Blob([data], { type: 'application/json' });
-        const file = new File([blob], fileName);
-
-        // The progressCallback is optional, but useful for future UI enhancements
-        const progressCallback = (progressData: any) => {
-            const percentage = Math.round((progressData?.total / progressData?.uploaded) * 100);
-            console.log(`Lighthouse Upload Progress: ${percentage}%`);
-        };
-
-        // lighthouse.upload expects a File object and the API key
-        const response = await lighthouse.upload(
-            {
-              persist: true,
-              target: {
-                files: [file],
-              },
-            },
+        // Using lighthouse.uploadText is simpler and more direct for string data
+        const response = await lighthouse.uploadText(
+            chatData,
             LIGHTHOUSE_API_KEY,
-            progressCallback,
+            fileName
         );
 
         // The response contains the CID (Hash) of the uploaded file
