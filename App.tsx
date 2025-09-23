@@ -177,19 +177,23 @@ const App: React.FC = () => {
     switch(view) {
       case 'landing':
         return (
-          <div className="text-center animate-fade-in-up">
-            <h1 className="text-5xl md:text-6xl font-bold text-brand-text mb-4">{APP_NAME}</h1>
-            <p className="text-lg md:text-xl text-brand-subtext mb-8">{APP_TAGLINE}</p>
+          <div className="text-center animate-fade-in-up flex flex-col items-center justify-center h-full px-4">
+            <h1 className="text-4xl md:text-6xl font-bold text-brand-dark-text mb-4 leading-tight">
+              AI-Powered Mental Health Support
+            </h1>
+            <p className="text-lg md:text-xl text-brand-dark-subtext max-w-2xl mb-8">
+              Daily check-ins, caring AI chat, mood tracking, and a safe community.
+            </p>
             <button
               onClick={connectWallet}
               disabled={isLoading}
-              className="bg-brand-primary text-white font-bold py-3 px-8 rounded-full shadow-lg hover:bg-brand-secondary transition-all duration-300 transform hover:scale-105 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center mx-auto"
+              className="bg-brand-dark-primary text-white font-bold py-4 px-8 rounded-full shadow-lg hover:bg-brand-dark-secondary transition-all duration-300 transform hover:scale-105 disabled:bg-gray-500 disabled:cursor-not-allowed flex items-center justify-center mx-auto text-lg"
             >
-              {isLoading ? <SpinnerIcon className="w-6 h-6" /> : <><WalletIcon className="w-6 h-6 mr-2" /> Connect Wallet to Start</>}
+              {isLoading ? <SpinnerIcon className="w-6 h-6" /> : <>🚀 Get Started – Connect Wallet</>}
             </button>
-            {connectError && (
-              <div className="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg max-w-md mx-auto text-left">
-                <p className="font-semibold">Connection Failed</p>
+             {connectError && (
+              <div className="mt-6 p-3 bg-red-900/50 border border-red-700 text-red-300 rounded-lg max-w-md mx-auto text-left">
+                <p className="font-semibold text-red-200">Connection Failed</p>
                 <p className="text-sm">{connectError}</p>
               </div>
             )}
@@ -232,12 +236,21 @@ const App: React.FC = () => {
         return <ChatPage account={account!} />;
     }
   };
+  
+  const getBackgroundColor = () => {
+    switch(view) {
+      case 'landing': return 'bg-brand-dark-bg';
+      case 'chat': return 'bg-brand-bg';
+      case 'payment': return 'bg-brand-bg';
+      default: return 'bg-brand-bg';
+    }
+  };
 
   return (
-    <div className={`min-h-screen font-sans bg-brand-bg ${view !== 'chat' ? 'flex items-center justify-center' : ''}`}>
-      <div className="w-full h-full">
-        {view !== 'chat' && <Header />}
-        <main className={`transition-opacity duration-500 ${view !== 'chat' ? 'p-4' : ''}`}>
+    <div className={`min-h-screen font-sans ${getBackgroundColor()} transition-colors duration-500`}>
+      <div className={`w-full h-screen ${view !== 'chat' ? 'flex items-center justify-center' : ''}`}>
+        {view === 'payment' && <Header />}
+        <main className={`w-full h-full transition-opacity duration-500 ${view !== 'chat' ? 'p-4' : ''}`}>
           {renderContent()}
         </main>
         {toast && (
