@@ -1,0 +1,5 @@
+{
+  "name": "AURA - Web3 AI Mental Health Companion",
+  "description": "A proof-of-concept application that combines an AI-powered mental health chatbot with Web3 payments on Polygon and decentralized storage on web3.storage.",
+  "requestFramePermissions": []
+}
