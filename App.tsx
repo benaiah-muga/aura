@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
-import { APP_NAME, APP_TAGLINE, POLYGON_AMOY_CHAIN_ID, PAYMENT_AMOUNT_MATIC, PAYMENT_RECIPIENT_ADDRESS, POLYGON_AMOY_NETWORK_NAME, POLYGON_AMOY_RPC_URL, POLYGON_AMOY_CURRENCY_SYMBOL } from './constants';
+import { APP_NAME, APP_TAGLINE, POLYGON_AMOY_CHAIN_ID, PAYMENT_AMOUNT, PAYMENT_RECIPIENT_ADDRESS, POLYGON_AMOY_NETWORK_NAME, POLYGON_AMOY_RPC_URL, POLYGON_AMOY_CURRENCY_SYMBOL } from './constants';
 import { WalletIcon } from './components/icons/WalletIcon';
 import { CheckCircleIcon } from './components/icons/CheckCircleIcon';
 import { SpinnerIcon } from './components/icons/SpinnerIcon';
@@ -108,7 +108,7 @@ const App: React.FC = () => {
       const signer = await provider.getSigner();
       const tx = await signer.sendTransaction({
         to: PAYMENT_RECIPIENT_ADDRESS,
-        value: ethers.parseEther(PAYMENT_AMOUNT_MATIC),
+        value: ethers.parseEther(PAYMENT_AMOUNT),
       });
       await tx.wait();
       localStorage.setItem(`payment_${account}`, 'true');
@@ -116,7 +116,7 @@ const App: React.FC = () => {
       setToast({ message: 'Payment successful! Chat unlocked.', type: 'success' });
     } catch (error: any) {
       console.error("Payment failed:", error);
-      const message = error.code === 'INSUFFICIENT_FUNDS' ? 'Insufficient MATIC for payment.' : 'Payment failed or was rejected.';
+      const message = error.code === 'INSUFFICIENT_FUNDS' ? `Insufficient ${POLYGON_AMOY_CURRENCY_SYMBOL} for payment.` : 'Payment failed or was rejected.';
       setToast({ message, type: 'error' });
     } finally {
       setIsLoading(false);
@@ -217,7 +217,7 @@ const App: React.FC = () => {
             <p className="text-brand-subtext mb-6">A one-time payment is required to access your AI companion and support the platform.</p>
             <div className="bg-brand-bg p-4 rounded-lg mb-6">
               <p className="text-brand-subtext">Amount</p>
-              <p className="text-3xl font-bold text-brand-primary">{PAYMENT_AMOUNT_MATIC} {POLYGON_AMOY_CURRENCY_SYMBOL}</p>
+              <p className="text-3xl font-bold text-brand-primary">{PAYMENT_AMOUNT} {POLYGON_AMOY_CURRENCY_SYMBOL}</p>
             </div>
             <button
               onClick={handlePayment}
