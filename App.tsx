@@ -13,7 +13,7 @@ import { CoinIcon } from './components/icons/CoinIcon';
 import { OnboardingPage, OnboardingData } from './components/OnboardingPage';
 import { DashboardPage } from './components/DashboardPage';
 
-type View = 'landing' | 'subscription' | 'onboarding' | 'dashboard' | 'chat';
+type View = 'landing' | 'connected' | 'subscription' | 'onboarding' | 'dashboard' | 'chat';
 type ToastState = { message: string; type: 'success' | 'error' } | null;
 
 const FeatureCard: React.FC<{icon: React.ReactNode, title: string, description: string}> = ({ icon, title, description }) => (
@@ -25,6 +25,24 @@ const FeatureCard: React.FC<{icon: React.ReactNode, title: string, description: 
         <p className="text-brand-dark-subtext text-base leading-relaxed">{description}</p>
     </div>
 );
+
+// New Connection Success Card
+const ConnectedCard: React.FC<{ account: string; onProceed: () => void; }> = ({ account, onProceed }) => (
+    <div className="min-h-screen bg-brand-dark-bg text-brand-dark-text flex flex-col items-center justify-center p-4 animate-fade-in-up">
+        <div className="w-full max-w-md bg-brand-dark-bg-secondary rounded-2xl shadow-2xl border border-white/10 p-8 text-center">
+            <CheckCircleIcon className="w-16 h-16 text-brand-accent mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-brand-dark-text mb-2">Connection Successful</h2>
+            <p className="text-brand-dark-subtext mb-6 break-words">Connected as: {account}</p>
+            <button
+                onClick={onProceed}
+                className="w-full bg-brand-dark-primary text-white font-bold py-3 px-6 rounded-lg shadow-lg hover:bg-brand-dark-secondary transition-colors duration-300"
+            >
+                Proceed
+            </button>
+        </div>
+    </div>
+);
+
 
 // Subscription Page Component (defined within App.tsx to avoid creating new files)
 const SubscriptionPage: React.FC<{ onSubscribe: () => void; isLoading: boolean; }> = ({ onSubscribe, isLoading }) => {
@@ -38,8 +56,8 @@ const SubscriptionPage: React.FC<{ onSubscribe: () => void; isLoading: boolean; 
     return (
         <div className="min-h-screen bg-brand-dark-bg text-brand-dark-text flex flex-col items-center justify-center p-4 animate-fade-in-up">
             <div className="w-full max-w-sm bg-brand-dark-bg-secondary rounded-2xl shadow-2xl border border-white/10 overflow-hidden">
-                <img 
-                    src="https://images.unsplash.com/photo-1611606042036-9a8e8b2d5f3b?q=80&w=1287&auto=format&fit=crop" 
+                <img
+                    src="https://images.unsplash.com/photo-1611606042036-9a8e8b2d5f3b?q=80&w=1287&auto=format&fit=crop"
                     alt="AI Companion"
                     className="w-full h-48 object-cover"
                 />
@@ -55,7 +73,7 @@ const SubscriptionPage: React.FC<{ onSubscribe: () => void; isLoading: boolean; 
                             </li>
                         ))}
                     </ul>
-                    
+
                     <button
                         onClick={onSubscribe}
                         disabled={isLoading}
@@ -115,7 +133,7 @@ const App: React.FC = () => {
         }
         return;
     }
-    
+
     // 3. Check if trial has expired
     if (trialExpiry && new Date().getTime() >= parseInt(trialExpiry, 10)) {
         console.log("Trial has expired.");
@@ -128,7 +146,7 @@ const App: React.FC = () => {
     const newTrialExpiry = new Date().getTime() + TRIAL_DURATION_MS;
     localStorage.setItem(`aura_trial_expiry_${userAddress}`, newTrialExpiry.toString());
     setToast({ message: "Welcome! Your 3-day free trial has started.", type: 'success' });
-    
+
     if (storedData) { // Grandfathering existing users into a trial
         setOnboardingData(JSON.parse(storedData));
         setView('dashboard');
@@ -152,21 +170,21 @@ const App: React.FC = () => {
         setAccount(newAddress);
         setProvider(new ethers.BrowserProvider(window.ethereum));
         localStorage.setItem('last_connected_account', newAddress);
-        checkAccessStatus(newAddress);
+        setView('connected');
       }
     };
 
     if (window.ethereum) {
       window.ethereum.on('accountsChanged', handleAccountsChanged);
     }
-    
+
     return () => {
       if (window.ethereum) {
         window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
       }
     };
   }, [checkAccessStatus]);
-  
+
   const connectWallet = async () => {
     if (!window.ethereum) {
       setToast({ message: "Please install a Web3 wallet like MetaMask.", type: 'error' });
@@ -187,9 +205,9 @@ const App: React.FC = () => {
       if (network.chainId !== BigInt(POLYGON_AMOY_CHAIN_ID)) {
         await switchNetwork(browserProvider);
       }
-      
-      checkAccessStatus(address);
-      setToast({ message: `Wallet connected: ${address.substring(0, 6)}...`, type: 'success' });
+
+      setToast({ message: `Wallet connected!`, type: 'success' });
+      setView('connected');
     } catch (error: any) {
       console.error("Failed to connect wallet:", error);
       setToast({ message: error.message || "An unexpected error occurred.", type: 'error' });
@@ -320,17 +338,17 @@ const App: React.FC = () => {
                 AURA provides the tools you need in a secure, decentralized environment.
             </p>
             <div className="grid md:grid-cols-3 gap-8">
-                <FeatureCard 
+                <FeatureCard
                     icon={<ChatBubbleIcon className="w-8 h-8"/>}
                     title="24/7 AI Companion"
                     description="A non-judgmental AI, trained to listen and provide supportive conversation whenever you need it."
                 />
-                 <FeatureCard 
+                 <FeatureCard
                     icon={<ShieldIcon className="w-8 h-8"/>}
                     title="Decentralized & Private"
                     description="Your conversations are yours. Save them to decentralized storage, ensuring your data remains private and secure."
                 />
-                 <FeatureCard 
+                 <FeatureCard
                     icon={<CoinIcon className="w-8 h-8"/>}
                     title="Simple Web3 Onboarding"
                     description="A low-cost payment on the Polygon network grants you access. No hidden fees, full ownership of your data."
@@ -349,6 +367,8 @@ const App: React.FC = () => {
     switch (view) {
         case 'landing':
             return renderLandingPage();
+        case 'connected':
+            return account ? <ConnectedCard account={account} onProceed={() => checkAccessStatus(account)} /> : renderLandingPage();
         case 'subscription':
             return <SubscriptionPage onSubscribe={handleSubscribe} isLoading={isLoading} />;
         case 'onboarding':
@@ -357,9 +377,9 @@ const App: React.FC = () => {
             return <DashboardPage userName={onboardingData?.name || 'friend'} onStartChat={handleStartChat} />;
         case 'chat':
             return account && onboardingData ? (
-                <ChatPage 
-                    account={account} 
-                    companion={selectedCompanion} 
+                <ChatPage
+                    account={account}
+                    companion={selectedCompanion}
                     userName={onboardingData.name}
                     initialUserMessage={initialMessage}
                 />
