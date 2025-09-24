@@ -102,32 +102,43 @@ const App: React.FC = () => {
   const [toast, setToast] = useState<ToastState>(null);
   const [onboardingData, setOnboardingData] = useState<OnboardingData | null>(null);
 
-  const checkAccessStatus = useCallback((userAddress: string) => {
+  const loadUserSession = (userAddress: string) => {
+    const storedData = localStorage.getItem(`aura_onboarding_data_${userAddress}`);
+    if (storedData) {
+        try {
+            const parsedData = JSON.parse(storedData);
+            // Validate that the parsed data is an object with the required properties
+            if (parsedData && typeof parsedData === 'object' && 'name' in parsedData && 'companion' in parsedData) {
+                setOnboardingData(parsedData);
+                setView('dashboard');
+                return;
+            }
+            console.warn("Invalid onboarding data found in localStorage. Forcing re-onboarding.");
+            localStorage.removeItem(`aura_onboarding_data_${userAddress}`); // Clean up bad data
+        } catch (error) {
+            console.error("Failed to parse onboarding data from localStorage:", error);
+            localStorage.removeItem(`aura_onboarding_data_${userAddress}`); // Clean up bad data
+        }
+    }
+    // If no stored data or if data was invalid, go to onboarding
+    setView('onboarding');
+  };
+  
+  const checkAccessStatus = (userAddress: string) => {
     const subExpiry = localStorage.getItem(`aura_subscription_expiry_${userAddress}`);
     const trialExpiry = localStorage.getItem(`aura_trial_expiry_${userAddress}`);
-    const storedData = localStorage.getItem(`aura_onboarding_data_${userAddress}`);
 
     // 1. Check for an active subscription
     if (subExpiry && new Date().getTime() < parseInt(subExpiry, 10)) {
         console.log("Active subscription found.");
-        if (storedData) {
-            setOnboardingData(JSON.parse(storedData));
-            setView('dashboard');
-        } else {
-            setView('onboarding');
-        }
+        loadUserSession(userAddress);
         return;
     }
 
     // 2. Check for an active trial
     if (trialExpiry && new Date().getTime() < parseInt(trialExpiry, 10)) {
         console.log("Active trial found.");
-         if (storedData) {
-            setOnboardingData(JSON.parse(storedData));
-            setView('dashboard');
-        } else {
-            setView('onboarding');
-        }
+        loadUserSession(userAddress);
         return;
     }
 
@@ -144,13 +155,9 @@ const App: React.FC = () => {
     localStorage.setItem(`aura_trial_expiry_${userAddress}`, newTrialExpiry.toString());
     setToast({ message: "Welcome! Your 3-day free trial has started.", type: 'success' });
 
-    if (storedData) { // Grandfathering existing users into a trial
-        setOnboardingData(JSON.parse(storedData));
-        setView('dashboard');
-    } else {
-        setView('onboarding');
-    }
-  }, []);
+    // Check for grandfathered data, otherwise start fresh onboarding
+    loadUserSession(userAddress);
+  };
 
 
   useEffect(() => {
@@ -180,7 +187,7 @@ const App: React.FC = () => {
         window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
       }
     };
-  }, [checkAccessStatus]);
+  }, []);
 
   const connectWallet = async () => {
     if (!window.ethereum) {
@@ -365,9 +372,16 @@ const App: React.FC = () => {
         case 'onboarding':
             return <OnboardingPage onComplete={handleOnboardingComplete} />;
         case 'dashboard':
-            return account && onboardingData ? (
-                <DashboardPage account={account} onboardingData={onboardingData} />
-            ) : renderLandingPage();
+            if (account && onboardingData) {
+                return <DashboardPage account={account} onboardingData={onboardingData} />;
+            }
+            // Add a loading state to prevent flickering to the landing page
+            // while onboardingData is being set.
+            return (
+                <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
+                    <SpinnerIcon className="w-16 h-16 text-brand-dark-primary" />
+                </div>
+            );
         default:
             return renderLandingPage();
     }
