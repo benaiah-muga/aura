@@ -5,7 +5,6 @@ import { APP_NAME, POLYGON_AMOY_CHAIN_ID, SUBSCRIPTION_PRICE_POL, PAYMENT_RECIPI
 import { WalletIcon } from './components/icons/WalletIcon';
 import { CheckCircleIcon } from './components/icons/CheckCircleIcon';
 import { SpinnerIcon } from './components/icons/SpinnerIcon';
-import { ChatPage } from './components/ChatPage';
 import { Toast } from './components/Toast';
 import { ChatBubbleIcon } from './components/icons/ChatBubbleIcon';
 import { ShieldIcon } from './components/icons/ShieldIcon';
@@ -13,7 +12,7 @@ import { CoinIcon } from './components/icons/CoinIcon';
 import { OnboardingPage, OnboardingData } from './components/OnboardingPage';
 import { DashboardPage } from './components/DashboardPage';
 
-type View = 'landing' | 'connected' | 'subscription' | 'onboarding' | 'dashboard' | 'chat';
+type View = 'landing' | 'connected' | 'subscription' | 'onboarding' | 'dashboard';
 type ToastState = { message: string; type: 'success' | 'error' } | null;
 
 const FeatureCard: React.FC<{icon: React.ReactNode, title: string, description: string}> = ({ icon, title, description }) => (
@@ -102,8 +101,6 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [toast, setToast] = useState<ToastState>(null);
   const [onboardingData, setOnboardingData] = useState<OnboardingData | null>(null);
-  const [selectedCompanion, setSelectedCompanion] = useState<'Luna' | 'Orion'>('Luna');
-  const [initialMessage, setInitialMessage] = useState<string>('');
 
   const checkAccessStatus = useCallback((userAddress: string) => {
     const subExpiry = localStorage.getItem(`aura_subscription_expiry_${userAddress}`);
@@ -282,12 +279,6 @@ const App: React.FC = () => {
     setToast({ message: "Setup complete. Welcome to your safe space.", type: 'success' });
   };
 
-  const handleStartChat = (companion: 'Luna' | 'Orion', message: string) => {
-    setSelectedCompanion(companion);
-    setInitialMessage(message);
-    setView('chat');
-  };
-
   const renderLandingPage = () => (
     <div className="min-h-screen bg-brand-dark-bg text-brand-dark-text font-sans flex flex-col">
       <main className="flex-grow flex flex-col justify-center items-center p-4 md:p-8 animate-fade-in-up">
@@ -374,15 +365,8 @@ const App: React.FC = () => {
         case 'onboarding':
             return <OnboardingPage onComplete={handleOnboardingComplete} />;
         case 'dashboard':
-            return <DashboardPage userName={onboardingData?.name || 'friend'} onStartChat={handleStartChat} />;
-        case 'chat':
             return account && onboardingData ? (
-                <ChatPage
-                    account={account}
-                    companion={selectedCompanion}
-                    userName={onboardingData.name}
-                    initialUserMessage={initialMessage}
-                />
+                <DashboardPage account={account} onboardingData={onboardingData} />
             ) : renderLandingPage();
         default:
             return renderLandingPage();

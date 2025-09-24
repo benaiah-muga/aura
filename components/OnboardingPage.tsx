@@ -1,11 +1,16 @@
+
 import React, { useState } from 'react';
 import { ArrowLeftIcon } from './icons/ArrowLeftIcon';
+import { LUNA_IMAGE_B64, ORION_IMAGE_B64 } from '../constants';
+import { CheckIcon } from './icons/CheckIcon';
 
-const TOTAL_STEPS = 4;
+
+const TOTAL_STEPS = 5;
 
 export interface OnboardingData {
   name: string;
   mood: string;
+  companion: 'Luna' | 'Orion';
   emergencyContact: {
     name: string;
     contact: string;
@@ -25,11 +30,54 @@ const moodOptions = [
   "Other",
 ];
 
+const companions = {
+    Luna: {
+      name: 'Luna',
+      descriptor: 'Compassionate & Wise',
+      avatar: LUNA_IMAGE_B64,
+    },
+    Orion: {
+      name: 'Orion',
+      descriptor: 'Calm & Analytical',
+      avatar: ORION_IMAGE_B64,
+    }
+};
+
+const CompanionCard: React.FC<{ name: 'Luna' | 'Orion'; isSelected: boolean; onSelect: () => void; }> = ({ name, isSelected, onSelect }) => {
+    const companion = companions[name];
+    const baseClasses = "relative group flex flex-col items-center justify-center p-6 bg-brand-dark-bg rounded-2xl cursor-pointer transition-all duration-300 border-2";
+    const selectedClasses = "border-brand-purple animate-glow";
+    const unselectedClasses = "border-white/10 hover:border-white/20";
+  
+    return (
+        <div onClick={onSelect} className={`${baseClasses} ${isSelected ? selectedClasses : unselectedClasses}`}>
+            {isSelected && (
+                <div className="absolute top-3 right-3 bg-brand-purple text-white rounded-full p-1 z-10">
+                    <CheckIcon className="w-4 h-4" />
+                </div>
+            )}
+            <div className="w-full aspect-square rounded-xl mb-4 overflow-hidden relative">
+                <img 
+                    src={companion.avatar} 
+                    alt={companion.name} 
+                    className={`w-full h-full object-cover transition-transform duration-300 group-hover:scale-105`}
+                />
+                 <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
+                    <h3 className="text-2xl font-bold text-white shadow-xl">{companion.name}</h3>
+                    <p className="text-white/80 text-sm">{companion.descriptor}</p>
+                </div>
+            </div>
+           
+        </div>
+    );
+};
+
 export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<OnboardingData>({
     name: '',
     mood: '',
+    companion: 'Luna', // Default selection
     emergencyContact: { name: '', contact: '' },
   });
 
@@ -59,7 +107,7 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
             emergencyContact: { ...prev.emergencyContact, [field]: value }
         }));
     } else {
-        setFormData(prev => ({ ...prev, [name]: value }));
+        setFormData(prev => ({ ...prev, [name]: value as any }));
     }
   };
 
@@ -109,9 +157,20 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
               </div>
             </div>
           );
-      case 3:
+    case 3:
         return (
             <div key={3} className="animate-slide-in-from-right">
+                <h2 className="text-3xl font-bold text-brand-dark-text mb-2">Choose your Companion</h2>
+                <p className="text-brand-dark-subtext mb-8">Select the AI you'd like to talk to. You can change this later.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <CompanionCard name="Luna" isSelected={formData.companion === 'Luna'} onSelect={() => setFormData(prev => ({ ...prev, companion: 'Luna' }))} />
+                    <CompanionCard name="Orion" isSelected={formData.companion === 'Orion'} onSelect={() => setFormData(prev => ({ ...prev, companion: 'Orion' }))} />
+                </div>
+            </div>
+        );
+      case 4:
+        return (
+            <div key={4} className="animate-slide-in-from-right">
                 <h2 className="text-3xl font-bold text-brand-dark-text mb-2">Your Safety Net</h2>
                 <p className="text-brand-dark-subtext mb-8">This is optional, but it's good to have a trusted contact. This is stored securely for your eyes only.</p>
                 <div className="space-y-4">
@@ -142,12 +201,12 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
                 </div>
             </div>
         );
-      case 4:
+      case 5:
         return (
-            <div key={4} className="animate-slide-in-from-right text-center">
+            <div key={5} className="animate-slide-in-from-right text-center">
                 <div className="text-6xl mb-6">🎉</div>
                 <h2 className="text-3xl font-bold text-brand-dark-text mb-2">You're all set, {formData.name}!</h2>
-                <p className="text-brand-dark-subtext max-w-sm mx-auto">Your personalized, safe space is ready. Remember, this is a place to reflect, grow, and be heard.</p>
+                <p className="text-brand-dark-subtext max-w-sm mx-auto">Your personalized, safe space with <span className="text-brand-dark-text font-semibold">{formData.companion}</span> is ready.</p>
             </div>
         );
       default:
@@ -157,6 +216,7 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
 
   const isNextDisabled = () => {
     if (currentStep === 1 && !formData.name.trim()) return true;
+    if (currentStep === 3 && !formData.companion) return true;
     return false;
   };
 
@@ -172,12 +232,12 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
             </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-brand-dark-bg-secondary/50 border border-white/10 p-8 rounded-2xl shadow-2xl min-h-[420px] flex flex-col justify-between">
+        <form onSubmit={handleSubmit} className="bg-brand-dark-bg-secondary/50 border border-white/10 p-8 rounded-2xl shadow-2xl min-h-[480px] flex flex-col justify-between">
             <div>{renderStep()}</div>
             
             <div className="flex items-center justify-between mt-8">
                 <div>
-                    {currentStep > 1 && (
+                    {currentStep > 1 && currentStep <= TOTAL_STEPS && (
                         <button type="button" onClick={handleBack} className="flex items-center space-x-2 text-brand-dark-subtext hover:text-brand-dark-text transition-colors">
                             <ArrowLeftIcon />
                             <span>Back</span>
@@ -186,7 +246,7 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
                 </div>
                 
                 <div>
-                {currentStep < TOTAL_STEPS && (
+                {currentStep < TOTAL_STEPS && currentStep !== 2 && (
                     <button 
                         type="button" 
                         onClick={handleNext}
@@ -196,7 +256,7 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
                         Next
                     </button>
                 )}
-                 {currentStep === 3 && (
+                 {currentStep === 4 && (
                      <button 
                         type="button" 
                         onClick={handleNext}
@@ -210,7 +270,7 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
                         type="submit"
                         className="bg-brand-dark-primary text-white font-bold py-3 px-8 rounded-full shadow-lg hover:bg-brand-dark-secondary transition-all duration-300 transform hover:scale-105 animate-subtle-pulse"
                     >
-                        Start Chatting
+                        Enter AURA
                     </button>
                 )}
                 </div>

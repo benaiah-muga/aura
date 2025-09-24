@@ -1,36 +1,41 @@
 
-import React, { useState, useEffect } from 'react';
-import { PlusIcon } from './icons/PlusIcon';
-import { PaperAirplaneIcon } from './icons/PaperAirplaneIcon';
-import { CheckIcon } from './icons/CheckIcon';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { HomeIcon } from './icons/HomeIcon';
 import { HistoryIcon } from './icons/HistoryIcon';
 import { BookOpenIcon } from './icons/BookOpenIcon';
 import { CogIcon } from './icons/CogIcon';
 import { MenuIcon } from './icons/MenuIcon';
 import { XIcon } from './icons/XIcon';
-import { APP_NAME } from '../constants';
+import { APP_NAME, LUNA_IMAGE_B64, ORION_IMAGE_B64 } from '../constants';
+import { OnboardingData } from './OnboardingPage';
+import { SpinnerIcon } from './icons/SpinnerIcon';
+import { Toast } from './Toast';
+import { streamAIResponse } from '../services/geminiService';
+import { uploadChatHistory } from '../services/web3storageService';
+import { ChatMessage, MessageAuthor } from '../types';
 
-type Companion = 'Luna' | 'Orion';
 type DashboardView = 'home' | 'history' | 'journal' | 'settings';
 
 interface DashboardPageProps {
-  userName: string;
-  onStartChat: (companion: Companion, initialMessage: string) => void;
+  account: string;
+  onboardingData: OnboardingData;
 }
 
+type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+type ToastState = { message: string; type: 'success' | 'error' } | null;
+
 const companions = {
-  Luna: {
-    name: 'Luna',
-    descriptor: 'Compassionate & Wise',
-    avatar: 'https://picsum.photos/seed/luna/200',
-    welcome: (name: string) => `Hello ${name}, how are you feeling today? Anything on your mind you'd like to share?`
+  'Luna': {
+      name: 'Luna',
+      avatar: LUNA_IMAGE_B64,
+      systemInstruction: `You are Luna, a caring and supportive AI companion with a compassionate and wise personality. Your purpose is to provide a safe, non-judgmental space for users to express their thoughts and feelings. Respond with empathy, kindness, and encouragement. Keep your responses concise and conversational. Your tone should be warm and calming. Address the user by their name, which is {userName}.`,
+      welcome: (name: string) => `Hello ${name}, it's good to see you. What's on your mind today?`
   },
-  Orion: {
-    name: 'Orion',
-    descriptor: 'Calm & Analytical',
-    avatar: 'https://picsum.photos/seed/orion/200',
-    welcome: (name: string) => `Greetings ${name}. I am Orion. What is the primary issue you wish to discuss?`
+  'Orion': {
+      name: 'Orion',
+      avatar: ORION_IMAGE_B64,
+      systemInstruction: `You are Orion, a calm and analytical AI companion. You help users understand their thoughts and feelings through logical exploration and gentle questioning. Your approach is structured and mindful. You are patient and thoughtful in your responses. Keep your responses concise and conversational. Address the user by their name, which is {userName}.`,
+      welcome: (name: string) => `Greetings, ${name}. I am ready to listen. What would you like to explore?`
   }
 };
 
@@ -79,106 +84,202 @@ const TrialCountdown: React.FC = () => {
     }
 
     return (
-        <div className="absolute top-0 left-0 right-0 bg-brand-purple/90 text-white text-center p-2 text-sm backdrop-blur-sm z-20 shadow-lg">
+        <div className="bg-brand-purple/90 text-white text-center p-2 text-sm backdrop-blur-sm z-20 shadow-lg">
             <strong>Trial Period:</strong> {timeLeft}
         </div>
     );
 };
 
-const CompanionCard: React.FC<{ name: Companion; isSelected: boolean; onSelect: () => void; }> = ({ name, isSelected, onSelect }) => {
-    const companion = companions[name];
-    const baseClasses = "relative group flex flex-col items-center justify-center p-6 bg-brand-dark-bg-secondary rounded-2xl cursor-pointer transition-all duration-300 border-2";
-    const selectedClasses = "border-brand-purple animate-glow";
-    const unselectedClasses = "border-transparent hover:border-white/20";
+const TypingIndicator: React.FC = () => (
+    <div className="flex items-center space-x-1.5 ml-4">
+      <div className="w-2 h-2 bg-brand-secondary rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
+      <div className="w-2 h-2 bg-brand-secondary rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+      <div className="w-2 h-2 bg-brand-secondary rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+    </div>
+);
+
+const ChatInterface: React.FC<{
+    account: string;
+    companion: 'Luna' | 'Orion';
+    userName: string;
+}> = ({ account, companion, userName }) => {
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
+    const [input, setInput] = useState('');
+    const [isAiTyping, setIsAiTyping] = useState(false);
+    const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+    const [toast, setToast] = useState<ToastState>(null);
+    
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const currentCompanion = companions[companion];
+    const chatHistoryKey = `aura_chat_history_${account}_${companion}`;
   
+    const scrollToBottom = () => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    };
+  
+    useEffect(scrollToBottom, [messages, isAiTyping]);
+  
+    // Load/initialize chat history on mount
+    useEffect(() => {
+      const storedHistory = localStorage.getItem(chatHistoryKey);
+      if (storedHistory) {
+        setMessages(JSON.parse(storedHistory));
+      } else {
+        // Start with a welcome message if no history exists
+        setMessages([{
+            author: MessageAuthor.AI,
+            text: currentCompanion.welcome(userName)
+        }]);
+      }
+    }, [chatHistoryKey, currentCompanion, userName]);
+  
+    // Save chat history to localStorage whenever it changes
+    useEffect(() => {
+      if (messages.length > 0) {
+        localStorage.setItem(chatHistoryKey, JSON.stringify(messages));
+      }
+    }, [messages, chatHistoryKey]);
+  
+  
+    const getAiResponse = useCallback(async (history: ChatMessage[], newMessage: string) => {
+      setIsAiTyping(true);
+      
+      const userMessage: ChatMessage = { author: MessageAuthor.USER, text: newMessage };
+      const currentMessages = [...history, userMessage];
+      
+      let aiResponse = '';
+      const aiMessage: ChatMessage = { author: MessageAuthor.AI, text: '' };
+      setMessages([...currentMessages, aiMessage]);
+  
+      const instruction = currentCompanion.systemInstruction.replace('{userName}', userName);
+  
+      await streamAIResponse(history, newMessage, (chunk) => {
+          aiResponse += chunk;
+          setMessages(prev => prev.map((msg, index) => 
+              index === prev.length - 1 ? { ...msg, text: aiResponse } : msg
+          ));
+      }, instruction);
+      
+      setIsAiTyping(false);
+    }, [currentCompanion.systemInstruction, userName]);
+    
+    const handleSendMessage = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!input.trim() || isAiTyping) return;
+      // Pass only messages before user input to AI history
+      const historyToSend = messages.slice();
+      if (historyToSend.length === 1 && historyToSend[0].author === MessageAuthor.AI) {
+        // If it's only the welcome message, send an empty history
+        getAiResponse([], input);
+      } else {
+        getAiResponse(historyToSend, input);
+      }
+      setInput('');
+    };
+  
+    const handleSaveChat = async () => {
+      setSaveStatus('saving');
+      const cid = await uploadChatHistory(messages);
+      if (cid) {
+        setSaveStatus('saved');
+        setToast({ message: `Chat saved! CID: ${cid.substring(0,10)}...`, type: 'success'});
+        setTimeout(() => setSaveStatus('idle'), 3000);
+      } else {
+        setSaveStatus('error');
+        setToast({ message: 'Failed to save chat history.', type: 'error' });
+        setTimeout(() => setSaveStatus('idle'), 3000);
+      }
+    };
+
     return (
-        <div onClick={onSelect} className={`${baseClasses} ${isSelected ? selectedClasses : unselectedClasses}`}>
-            {isSelected && (
-                <div className="absolute top-3 right-3 bg-brand-purple text-white rounded-full p-1">
-                    <CheckIcon className="w-4 h-4" />
+        <div className="flex flex-col flex-1 h-full animate-fade-in-up">
+            {/* Chat Header */}
+            <header className="bg-brand-dark-bg/80 backdrop-blur-md border-b border-white/10 p-4 flex justify-between items-center z-10 flex-shrink-0">
+                <div className="flex items-center space-x-3">
+                <img src={currentCompanion.avatar} alt={currentCompanion.name} className="w-10 h-10 rounded-full object-cover" />
+                <h1 className="text-xl font-bold text-brand-dark-text">{currentCompanion.name}</h1>
                 </div>
+                <button
+                    onClick={handleSaveChat}
+                    disabled={saveStatus !== 'idle'}
+                    className="bg-brand-purple text-white font-semibold py-2 px-4 rounded-lg shadow-sm hover:bg-brand-purple/80 transition-colors duration-200 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center"
+                >
+                {saveStatus === 'saving' && <SpinnerIcon className="mr-2" />}
+                {saveStatus === 'saved' ? 'Saved!' : 'Save Chat to Web3'}
+                </button>
+            </header>
+    
+            {/* Messages */}
+            <main className="flex-1 overflow-y-auto p-6">
+                <div className="max-w-3xl mx-auto space-y-6">
+                {messages.map((message, index) => (
+                    <div
+                    key={index}
+                    className={`flex items-end gap-3 ${
+                        message.author === MessageAuthor.USER ? 'justify-end' : 'justify-start'
+                    }`}
+                    >
+                    {message.author === MessageAuthor.AI && (
+                        <img src={currentCompanion.avatar} alt={currentCompanion.name} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                    )}
+                    <div
+                        className={`max-w-md lg:max-w-lg p-4 rounded-2xl shadow-sm ${
+                        message.author === MessageAuthor.USER
+                            ? 'bg-brand-purple text-white rounded-br-none'
+                            : 'bg-brand-dark-bg-secondary text-brand-dark-text rounded-bl-none'
+                        }`}
+                    >
+                        <p className="whitespace-pre-wrap">{message.text}</p>
+                    </div>
+                    </div>
+                ))}
+                {isAiTyping && (
+                    <div className="flex items-end gap-3 justify-start">
+                    <img src={currentCompanion.avatar} alt={currentCompanion.name} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                    <div className="bg-brand-dark-bg-secondary p-4 rounded-2xl shadow-sm rounded-bl-none">
+                        <TypingIndicator />
+                    </div>
+                    </div>
+                )}
+                <div ref={messagesEndRef} />
+                </div>
+            </main>
+    
+            {/* Input Footer */}
+            <footer className="bg-brand-dark-bg/80 backdrop-blur-md p-4 border-t border-white/10">
+                <form onSubmit={handleSendMessage} className="max-w-3xl mx-auto">
+                <div className="flex items-center bg-brand-dark-bg-secondary border border-gray-700 rounded-full shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-brand-purple transition-all">
+                    <input
+                    type="text"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder="Type your message here..."
+                    className="w-full p-4 bg-transparent border-none focus:ring-0 text-brand-dark-text"
+                    disabled={isAiTyping}
+                    />
+                    <button
+                    type="submit"
+                    disabled={!input.trim() || isAiTyping}
+                    className="bg-brand-purple text-white rounded-full w-10 h-10 m-2 flex-shrink-0 flex items-center justify-center hover:bg-brand-purple/80 transition-colors disabled:bg-gray-500"
+                    >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+                    </svg>
+                    </button>
+                </div>
+                </form>
+            </footer>
+            {toast && (
+                <Toast
+                    message={toast.message}
+                    type={toast.type}
+                    onClose={() => setToast(null)}
+                />
             )}
-            <img 
-                src={companion.avatar} 
-                alt={companion.name} 
-                className={`w-32 h-32 rounded-full object-cover mb-4 border-4 transition-all duration-300 ${isSelected ? 'border-brand-purple/50' : 'border-gray-700 group-hover:border-gray-500'}`}
-            />
-            <h3 className="text-2xl font-bold text-brand-dark-text">{companion.name}</h3>
-            <p className="text-brand-dark-subtext">{companion.descriptor}</p>
         </div>
     );
 };
 
-const DashboardHome: React.FC<DashboardPageProps> = ({ userName, onStartChat }) => {
-    const [selectedCompanion, setSelectedCompanion] = useState<Companion>('Luna');
-    const [message, setMessage] = useState('');
-  
-    const handleSend = () => {
-      if (!message.trim()) return;
-      onStartChat(selectedCompanion, message);
-    };
-  
-    const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === 'Enter') {
-          handleSend();
-      }
-    };
-    
-    const currentCompanion = companions[selectedCompanion];
-  
-    return (
-      <div className="flex flex-col flex-1 justify-between p-4 sm:p-6 md:p-8 animate-fade-in-up">
-        <main className="flex-1 flex flex-col items-center justify-center pt-12 sm:pt-0">
-          <div className="text-center mb-12">
-              <h1 className="text-4xl md:text-5xl font-bold text-brand-dark-text">Choose your Companion</h1>
-              <p className="text-lg text-brand-dark-subtext mt-2">Select an AI you'd like to talk to.</p>
-          </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 w-full max-w-3xl mb-12">
-              <CompanionCard name="Luna" isSelected={selectedCompanion === 'Luna'} onSelect={() => setSelectedCompanion('Luna')} />
-              <CompanionCard name="Orion" isSelected={selectedCompanion === 'Orion'} onSelect={() => setSelectedCompanion('Orion')} />
-          </div>
-          
-          <div className="w-full max-w-3xl space-y-4">
-              <div className="flex justify-center">
-                  <div className="bg-brand-dark-bg-secondary text-xs text-brand-dark-subtext px-3 py-1 rounded-full">
-                      Today
-                  </div>
-              </div>
-              <div className="flex items-end gap-3 justify-start">
-                  <img src={currentCompanion.avatar} alt={currentCompanion.name} className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
-                  <div className="max-w-md lg:max-w-lg p-4 rounded-2xl rounded-bl-none shadow-sm bg-brand-dark-bg-secondary text-brand-dark-text">
-                      <p>{currentCompanion.welcome(userName)}</p>
-                  </div>
-              </div>
-          </div>
-        </main>
-  
-        <footer className="w-full max-w-3xl mx-auto mt-8">
-          <div className="flex items-center bg-brand-dark-bg-secondary rounded-xl p-2 shadow-lg border border-white/10">
-            <button className="p-2 text-brand-dark-subtext hover:text-brand-dark-text transition-colors">
-              <PlusIcon className="w-6 h-6" />
-            </button>
-            <input
-              type="text"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Type your message..."
-              className="w-full p-2 bg-transparent border-none focus:ring-0 text-brand-dark-text placeholder-brand-dark-subtext"
-            />
-            <button
-              onClick={handleSend}
-              disabled={!message.trim()}
-              className="bg-brand-purple text-white rounded-lg w-10 h-10 flex-shrink-0 flex items-center justify-center hover:bg-brand-purple/80 transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed"
-            >
-              <PaperAirplaneIcon className="w-5 h-5" />
-            </button>
-          </div>
-        </footer>
-      </div>
-    );
-};
 
 const PlaceholderComponent: React.FC<{title: string}> = ({title}) => (
     <div className="p-8 animate-fade-in-up">
@@ -244,14 +345,16 @@ const Sidebar: React.FC<{
     );
 };
 
-export const DashboardPage: React.FC<DashboardPageProps> = ({ userName, onStartChat }) => {
+export const DashboardPage: React.FC<DashboardPageProps> = ({ account, onboardingData }) => {
     const [activeView, setActiveView] = useState<DashboardView>('home');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+    const { name: userName, companion } = onboardingData;
 
     const renderContent = () => {
         switch(activeView) {
             case 'home':
-                return <DashboardHome userName={userName} onStartChat={onStartChat} />;
+                return <ChatInterface userName={userName} companion={companion} account={account} />;
             case 'history':
                 return <ChatHistoryPage />;
             case 'journal':
@@ -259,7 +362,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ userName, onStartC
             case 'settings':
                 return <SettingsPage />;
             default:
-                return <DashboardHome userName={userName} onStartChat={onStartChat} />;
+                return <ChatInterface userName={userName} companion={companion} account={account} />;
         }
     };
 
@@ -267,8 +370,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ userName, onStartC
         <div className="min-h-screen bg-brand-dark-bg text-brand-dark-text font-sans flex">
             <Sidebar activeView={activeView} setActiveView={setActiveView} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
             
-            <div className="flex-1 flex flex-col md:ml-64">
-                <header className="md:hidden bg-brand-dark-bg-secondary/80 backdrop-blur-md p-4 flex items-center justify-between sticky top-0 z-30 border-b border-white/10">
+            <div className="flex-1 flex flex-col md:ml-64 h-screen">
+                <header className="md:hidden bg-brand-dark-bg-secondary/80 backdrop-blur-md p-4 flex items-center justify-between sticky top-0 z-30 border-b border-white/10 flex-shrink-0">
                     <div className="flex items-center space-x-2">
                         <span className="text-xl">🧘</span>
                         <span className="text-xl font-bold text-brand-dark-text">{APP_NAME}</span>
@@ -278,9 +381,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ userName, onStartC
                     </button>
                 </header>
                 
-                <div className="flex-1 relative flex flex-col">
-                    <TrialCountdown />
-                    {renderContent()}
+                <div className="flex-1 relative flex flex-col overflow-hidden">
+                    <div className="absolute top-0 left-0 right-0 z-20">
+                        <TrialCountdown />
+                    </div>
+                    <div className="flex-1 flex flex-col pt-8"> {/* Adjusted padding top */}
+                        {renderContent()}
+                    </div>
                 </div>
             </div>
         </div>

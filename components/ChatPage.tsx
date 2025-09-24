@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { streamAIResponse } from '../services/geminiService';
 import { uploadChatHistory } from '../services/web3storageService';
 import { ChatMessage, MessageAuthor } from '../types';
-import { APP_NAME } from '../constants';
+import { APP_NAME, LUNA_IMAGE_B64, ORION_IMAGE_B64 } from '../constants';
 import { SpinnerIcon } from './icons/SpinnerIcon';
 import { Toast } from './Toast';
 
@@ -20,12 +20,12 @@ type ToastState = { message: string; type: 'success' | 'error' } | null;
 const companionConfig = {
     'Luna': {
         name: 'Luna',
-        avatar: 'https://picsum.photos/seed/luna/200',
+        avatar: LUNA_IMAGE_B64,
         systemInstruction: `You are Luna, a caring and supportive AI companion with a compassionate and wise personality. Your purpose is to provide a safe, non-judgmental space for users to express their thoughts and feelings. Respond with empathy, kindness, and encouragement. Keep your responses concise and conversational. Your tone should be warm and calming. Address the user by their name, which is {userName}.`,
     },
     'Orion': {
         name: 'Orion',
-        avatar: 'https://picsum.photos/seed/orion/200',
+        avatar: ORION_IMAGE_B64,
         systemInstruction: `You are Orion, a calm and analytical AI companion. You help users understand their thoughts and feelings through logical exploration and gentle questioning. Your approach is structured and mindful. You are patient and thoughtful in your responses. Keep your responses concise and conversational. Address the user by their name, which is {userName}.`,
     }
 };
@@ -185,7 +185,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ account, companion, userName
               disabled={!input.trim() || isAiTyping}
               className="bg-brand-purple text-white rounded-full w-10 h-10 m-2 flex-shrink-0 flex items-center justify-center hover:bg-brand-purple/80 transition-colors disabled:bg-gray-500"
             >
-              <svg xmlns="http://www.w.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
               </svg>
             </button>
