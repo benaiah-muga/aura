@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
-import { APP_NAME, POLYGON_AMOY_CHAIN_ID, PAYMENT_AMOUNT, PAYMENT_RECIPIENT_ADDRESS, POLYGON_AMOY_NETWORK_NAME, POLYGON_AMOY_RPC_URL, POLYGON_AMOY_CURRENCY_SYMBOL } from './constants';
+import { APP_NAME, POLYGON_AMOY_CHAIN_ID, SUBSCRIPTION_PRICE_POL, PAYMENT_RECIPIENT_ADDRESS, POLYGON_AMOY_NETWORK_NAME, POLYGON_AMOY_RPC_URL, POLYGON_AMOY_CURRENCY_SYMBOL, TRIAL_DURATION_MS } from './constants';
 import { WalletIcon } from './components/icons/WalletIcon';
 import { CheckCircleIcon } from './components/icons/CheckCircleIcon';
 import { SpinnerIcon } from './components/icons/SpinnerIcon';
@@ -13,7 +13,7 @@ import { CoinIcon } from './components/icons/CoinIcon';
 import { OnboardingPage, OnboardingData } from './components/OnboardingPage';
 import { DashboardPage } from './components/DashboardPage';
 
-type View = 'landing' | 'payment' | 'onboarding' | 'dashboard' | 'chat';
+type View = 'landing' | 'subscription' | 'onboarding' | 'dashboard' | 'chat';
 type ToastState = { message: string; type: 'success' | 'error' } | null;
 
 const FeatureCard: React.FC<{icon: React.ReactNode, title: string, description: string}> = ({ icon, title, description }) => (
@@ -26,6 +26,56 @@ const FeatureCard: React.FC<{icon: React.ReactNode, title: string, description: 
     </div>
 );
 
+// Subscription Page Component (defined within App.tsx to avoid creating new files)
+const SubscriptionPage: React.FC<{ onSubscribe: () => void; isLoading: boolean; }> = ({ onSubscribe, isLoading }) => {
+    const features = [
+        "Unlimited AI chat",
+        "Advanced mood tracking",
+        "Exclusive community access",
+        "Guided journaling prompts",
+    ];
+
+    return (
+        <div className="min-h-screen bg-brand-dark-bg text-brand-dark-text flex flex-col items-center justify-center p-4 animate-fade-in-up">
+            <div className="w-full max-w-sm bg-brand-dark-bg-secondary rounded-2xl shadow-2xl border border-white/10 overflow-hidden">
+                <img 
+                    src="https://images.unsplash.com/photo-1611606042036-9a8e8b2d5f3b?q=80&w=1287&auto=format&fit=crop" 
+                    alt="AI Companion"
+                    className="w-full h-48 object-cover"
+                />
+                <div className="p-8 text-left">
+                    <h2 className="text-3xl font-bold text-brand-dark-text mb-2">Unlock Your AI Mental Health Companion</h2>
+                    <p className="text-brand-dark-subtext mb-6">$20/month <span className="text-xs">(paid in {POLYGON_AMOY_CURRENCY_SYMBOL} on Polygon)</span></p>
+
+                    <ul className="space-y-3 mb-8">
+                        {features.map((feature, index) => (
+                            <li key={index} className="flex items-center">
+                                <CheckCircleIcon className="w-5 h-5 text-brand-dark-primary mr-3" />
+                                <span className="text-brand-dark-text">{feature}</span>
+                            </li>
+                        ))}
+                    </ul>
+                    
+                    <button
+                        onClick={onSubscribe}
+                        disabled={isLoading}
+                        className="w-full bg-brand-dark-primary text-white font-bold py-3 px-6 rounded-lg shadow-lg hover:bg-brand-dark-secondary transition-colors duration-300 flex items-center justify-center disabled:bg-gray-600 disabled:cursor-not-allowed"
+                    >
+                        {isLoading ? (
+                            <>
+                                <SpinnerIcon className="mr-2" />
+                                <span>Processing...</span>
+                            </>
+                        ) : (
+                            <span>Subscribe Now</span>
+                        )}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 
 const App: React.FC = () => {
   const [view, setView] = useState<View>('landing');
@@ -37,38 +87,54 @@ const App: React.FC = () => {
   const [selectedCompanion, setSelectedCompanion] = useState<'Luna' | 'Orion'>('Luna');
   const [initialMessage, setInitialMessage] = useState<string>('');
 
-  const checkSubscriptionAndOnboarding = useCallback((userAddress: string) => {
-    // 1. Check for an active subscription
+  const checkAccessStatus = useCallback((userAddress: string) => {
     const subExpiry = localStorage.getItem(`aura_subscription_expiry_${userAddress}`);
+    const trialExpiry = localStorage.getItem(`aura_trial_expiry_${userAddress}`);
+    const storedData = localStorage.getItem(`aura_onboarding_data_${userAddress}`);
+
+    // 1. Check for an active subscription
     if (subExpiry && new Date().getTime() < parseInt(subExpiry, 10)) {
         console.log("Active subscription found.");
-        const storedData = localStorage.getItem(`aura_onboarding_data_${userAddress}`);
         if (storedData) {
             setOnboardingData(JSON.parse(storedData));
             setView('dashboard');
         } else {
-            // This case happens if they paid but didn't finish onboarding
             setView('onboarding');
         }
-        return true;
+        return;
     }
 
-    // 2. Grandfather existing users: Check for old onboarding data
-    const storedOnboardingData = localStorage.getItem(`aura_onboarding_data_${userAddress}`);
-    if (storedOnboardingData) {
-        console.log("Grandfathering user. Granting complimentary 30-day pass.");
-        const thirtyDaysFromNow = new Date().getTime() + 30 * 24 * 60 * 60 * 1000;
-        localStorage.setItem(`aura_subscription_expiry_${userAddress}`, thirtyDaysFromNow.toString());
-        setOnboardingData(JSON.parse(storedOnboardingData));
-        setToast({ message: "As an existing user, you've received a 30-day pass!", type: 'success' });
+    // 2. Check for an active trial
+    if (trialExpiry && new Date().getTime() < parseInt(trialExpiry, 10)) {
+        console.log("Active trial found.");
+         if (storedData) {
+            setOnboardingData(JSON.parse(storedData));
+            setView('dashboard');
+        } else {
+            setView('onboarding');
+        }
+        return;
+    }
+    
+    // 3. Check if trial has expired
+    if (trialExpiry && new Date().getTime() >= parseInt(trialExpiry, 10)) {
+        console.log("Trial has expired.");
+        setView('subscription');
+        return;
+    }
+
+    // 4. New user or existing user without trial -> Start a new trial
+    console.log("No active subscription or trial. Starting a new 3-day trial.");
+    const newTrialExpiry = new Date().getTime() + TRIAL_DURATION_MS;
+    localStorage.setItem(`aura_trial_expiry_${userAddress}`, newTrialExpiry.toString());
+    setToast({ message: "Welcome! Your 3-day free trial has started.", type: 'success' });
+    
+    if (storedData) { // Grandfathering existing users into a trial
+        setOnboardingData(JSON.parse(storedData));
         setView('dashboard');
-        return true;
+    } else {
+        setView('onboarding');
     }
-
-    // 3. No subscription, no old data -> new user
-    console.log("No active subscription or existing data found.");
-    setView('payment');
-    return false;
   }, []);
 
 
@@ -78,13 +144,15 @@ const App: React.FC = () => {
         setAccount(null);
         setProvider(null);
         setOnboardingData(null); // Clear data on disconnect
+        localStorage.removeItem('last_connected_account');
         setView('landing');
         setToast({ message: "Wallet disconnected.", type: 'success' });
       } else {
         const newAddress = accounts[0];
         setAccount(newAddress);
         setProvider(new ethers.BrowserProvider(window.ethereum));
-        checkSubscriptionAndOnboarding(newAddress);
+        localStorage.setItem('last_connected_account', newAddress);
+        checkAccessStatus(newAddress);
       }
     };
 
@@ -97,7 +165,7 @@ const App: React.FC = () => {
         window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
       }
     };
-  }, [checkSubscriptionAndOnboarding]);
+  }, [checkAccessStatus]);
   
   const connectWallet = async () => {
     if (!window.ethereum) {
@@ -113,13 +181,14 @@ const App: React.FC = () => {
       const address = signer.address;
       setAccount(address);
       setProvider(browserProvider);
+      localStorage.setItem('last_connected_account', address);
 
       const network = await browserProvider.getNetwork();
       if (network.chainId !== BigInt(POLYGON_AMOY_CHAIN_ID)) {
         await switchNetwork(browserProvider);
       }
       
-      checkSubscriptionAndOnboarding(address);
+      checkAccessStatus(address);
       setToast({ message: `Wallet connected: ${address.substring(0, 6)}...`, type: 'success' });
     } catch (error: any) {
       console.error("Failed to connect wallet:", error);
@@ -158,7 +227,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handlePayment = async () => {
+  const handleSubscribe = async () => {
     if (!provider || !account) {
         setToast({ message: "Wallet not connected.", type: 'error' });
         return;
@@ -168,19 +237,20 @@ const App: React.FC = () => {
         const signer = await provider.getSigner();
         const tx = await signer.sendTransaction({
             to: PAYMENT_RECIPIENT_ADDRESS,
-            value: ethers.parseEther(PAYMENT_AMOUNT),
+            value: ethers.parseEther(SUBSCRIPTION_PRICE_POL),
         });
         await tx.wait();
 
         const thirtyDaysFromNow = new Date().getTime() + 30 * 24 * 60 * 60 * 1000;
         localStorage.setItem(`aura_subscription_expiry_${account}`, thirtyDaysFromNow.toString());
+        localStorage.removeItem(`aura_trial_expiry_${account}`);
 
-        setToast({ message: "Payment successful! Let's get you set up.", type: 'success' });
-        setView('onboarding');
+        setToast({ message: "Subscription successful! Welcome back.", type: 'success' });
+        checkAccessStatus(account);
 
     } catch (error: any) {
-        console.error("Payment failed:", error);
-        setToast({ message: error.reason || "Payment failed or was rejected.", type: 'error' });
+        console.error("Subscription failed:", error);
+        setToast({ message: error.reason || "Subscription failed or was rejected.", type: 'error' });
     } finally {
         setIsLoading(false);
     }
@@ -275,44 +345,12 @@ const App: React.FC = () => {
     </div>
   );
 
-  const renderPaymentPage = () => (
-    <div className="min-h-screen bg-brand-dark-bg text-brand-dark-text flex flex-col items-center justify-center p-4 animate-fade-in-up">
-        <div className="w-full max-w-md bg-brand-dark-bg-secondary p-8 rounded-2xl shadow-2xl border border-white/10 text-center">
-            <div className="mx-auto bg-brand-dark-primary/20 text-brand-dark-primary rounded-full w-16 h-16 flex items-center justify-center mb-6">
-                <CheckCircleIcon className="w-8 h-8" />
-            </div>
-            <h2 className="text-2xl font-bold text-brand-dark-text mb-2">Wallet Connected!</h2>
-            <p className="text-brand-dark-subtext mb-6 break-words">Account: {account}</p>
-            <div className="bg-brand-dark-bg p-4 rounded-lg mb-6 border border-white/10">
-                <p className="text-sm text-brand-dark-subtext">30-Day Access Fee</p>
-                <p className="text-3xl font-bold text-brand-dark-text">{PAYMENT_AMOUNT} {POLYGON_AMOY_CURRENCY_SYMBOL}</p>
-            </div>
-            <button
-                onClick={handlePayment}
-                disabled={isLoading}
-                className="w-full bg-brand-dark-primary text-white font-bold py-3 px-6 rounded-lg shadow-lg hover:bg-brand-dark-secondary transition-colors duration-300 flex items-center justify-center disabled:bg-gray-600 disabled:cursor-not-allowed"
-            >
-                {isLoading ? (
-                    <>
-                        <SpinnerIcon className="mr-2" />
-                        <span>Processing...</span>
-                    </>
-                ) : (
-                    <span>Proceed to Payment</span>
-                )}
-            </button>
-            <p className="text-xs text-brand-dark-subtext mt-4">You will be prompted to confirm the transaction in your wallet.</p>
-        </div>
-    </div>
-  );
-
-
   const renderContent = () => {
     switch (view) {
         case 'landing':
             return renderLandingPage();
-        case 'payment':
-            return renderPaymentPage();
+        case 'subscription':
+            return <SubscriptionPage onSubscribe={handleSubscribe} isLoading={isLoading} />;
         case 'onboarding':
             return <OnboardingPage onComplete={handleOnboardingComplete} />;
         case 'dashboard':

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PlusIcon } from './icons/PlusIcon';
 import { PaperAirplaneIcon } from './icons/PaperAirplaneIcon';
 import { CheckIcon } from './icons/CheckIcon';
@@ -30,6 +30,58 @@ interface CompanionCardProps {
     isSelected: boolean;
     onSelect: () => void;
 }
+
+const TrialCountdown: React.FC = () => {
+    const account = window.localStorage.getItem('last_connected_account');
+    const trialExpiryStr = account ? window.localStorage.getItem(`aura_trial_expiry_${account}`) : null;
+    
+    const [timeLeft, setTimeLeft] = useState<string>('');
+
+    useEffect(() => {
+        if (!trialExpiryStr) return;
+
+        const trialExpiry = parseInt(trialExpiryStr, 10);
+
+        const updateCountdown = () => {
+            const now = new Date().getTime();
+            const distance = trialExpiry - now;
+
+            if (distance < 0) {
+                setTimeLeft('Trial has expired.');
+                return false;
+            }
+
+            const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+            setTimeLeft(`${days}d ${hours}h ${minutes}m ${seconds}s remaining`);
+            return true;
+        };
+        
+        if (updateCountdown()) {
+             const timer = setInterval(() => {
+                if (!updateCountdown()) {
+                    clearInterval(timer);
+                }
+            }, 1000);
+            return () => clearInterval(timer);
+        }
+
+    }, [trialExpiryStr]);
+
+    if (!trialExpiryStr || new Date().getTime() > parseInt(trialExpiryStr, 10)) {
+        return null;
+    }
+
+    return (
+        <div className="absolute top-0 left-0 right-0 bg-brand-purple/90 text-white text-center p-2 text-sm backdrop-blur-sm z-50 shadow-lg">
+            <strong>Trial Period:</strong> {timeLeft}
+        </div>
+    );
+};
+
 
 const CompanionCard: React.FC<CompanionCardProps> = ({ name, isSelected, onSelect }) => {
     const companion = companions[name];
@@ -74,8 +126,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ userName, onStartC
   const currentCompanion = companions[selectedCompanion];
 
   return (
-    <div className="min-h-screen bg-brand-dark-bg text-brand-dark-text font-sans flex flex-col justify-between p-4 sm:p-6 md:p-8 animate-fade-in-up">
-      <main className="flex-1 flex flex-col items-center justify-center">
+    <div className="relative min-h-screen bg-brand-dark-bg text-brand-dark-text font-sans flex flex-col justify-between p-4 sm:p-6 md:p-8 animate-fade-in-up">
+      <TrialCountdown />
+      <main className="flex-1 flex flex-col items-center justify-center pt-12 sm:pt-0">
         <div className="text-center mb-12">
             <h1 className="text-4xl md:text-5xl font-bold text-brand-dark-text">Choose your Companion</h1>
             <p className="text-lg text-brand-dark-subtext mt-2">Select an AI you'd like to talk to.</p>
