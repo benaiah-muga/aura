@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { APP_NAME, POLYGON_AMOY_CHAIN_ID, PAYMENT_AMOUNT, PAYMENT_RECIPIENT_ADDRESS, POLYGON_AMOY_NETWORK_NAME, POLYGON_AMOY_RPC_URL, POLYGON_AMOY_CURRENCY_SYMBOL } from './constants';
@@ -43,9 +44,16 @@ const App: React.FC = () => {
         const accounts = await browserProvider.listAccounts();
         if (accounts.length > 0) {
           const signer = await browserProvider.getSigner();
-          setAccount(signer.address);
+          const userAddress = signer.address;
+          setAccount(userAddress);
           setProvider(browserProvider);
-          console.log("Wallet already connected:", signer.address);
+          console.log("Wallet already connected:", userAddress);
+
+          // Check for existing onboarding data
+          const storedData = localStorage.getItem(`aura_onboarding_data_${userAddress}`);
+          if (storedData) {
+            setOnboardingData(JSON.parse(storedData));
+          }
         }
       } catch (error) {
         console.error("Error checking wallet connection:", error);
@@ -60,6 +68,7 @@ const App: React.FC = () => {
       if (accounts.length === 0) {
         setAccount(null);
         setProvider(null);
+        setOnboardingData(null); // Clear data on disconnect
         setView('landing');
         setToast({ message: "Wallet disconnected.", type: 'success' });
       } else {
@@ -152,10 +161,11 @@ const App: React.FC = () => {
         });
         await tx.wait();
 
-        const isOnboardingComplete = localStorage.getItem(`aura_onboarding_completed_${account}`);
-        if (isOnboardingComplete) {
+        const existingOnboardingData = localStorage.getItem(`aura_onboarding_data_${account}`);
+        if (existingOnboardingData) {
+            setOnboardingData(JSON.parse(existingOnboardingData));
             setToast({ message: "Welcome back to Aura!", type: 'success' });
-            setView('chat');
+            setView('dashboard');
         } else {
             setToast({ message: "Payment successful! Let's get you set up.", type: 'success' });
             setView('onboarding');
@@ -170,9 +180,8 @@ const App: React.FC = () => {
 
   const handleOnboardingComplete = (data: OnboardingData) => {
     if (!account) return;
-    // In a real app, you might encrypt and store this data using Lighthouse.
-    console.log("Onboarding complete:", data);
-    localStorage.setItem(`aura_onboarding_completed_${account}`, 'true');
+    // Persist the full onboarding data to localStorage
+    localStorage.setItem(`aura_onboarding_data_${account}`, JSON.stringify(data));
     setOnboardingData(data);
     setView('dashboard');
     setToast({ message: "Setup complete. Welcome to your safe space.", type: 'success' });
