@@ -1,28 +1,31 @@
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
+import { ethers } from 'ethers';
 import { HomeIcon } from './icons/HomeIcon';
-import { HistoryIcon } from './icons/HistoryIcon';
+import { ChatBubbleIcon } from './icons/ChatBubbleIcon';
 import { BookOpenIcon } from './icons/BookOpenIcon';
 import { CogIcon } from './icons/CogIcon';
 import { MenuIcon } from './icons/MenuIcon';
 import { XIcon } from './icons/XIcon';
 import { APP_NAME, LUNA_IMAGE_B64, ORION_IMAGE_B64 } from '../constants';
 import { OnboardingData } from './OnboardingPage';
-import { SpinnerIcon } from './icons/SpinnerIcon';
+import { ChatInterface } from './pages/ChatPage';
+import { HomePage } from './pages/HomePage';
+import { MoodPage } from './pages/MoodPage';
+import { SubscriptionPage } from './pages/SubscriptionPage';
 import { Toast } from './Toast';
-import { streamAIResponse } from '../services/geminiService';
-import { uploadChatHistory } from '../services/web3storageService';
-import { ChatMessage, MessageAuthor } from '../types';
 
-type DashboardView = 'home' | 'history' | 'journal' | 'settings';
+type DashboardView = 'home' | 'chat' | 'mood' | 'settings';
+type ToastState = { message: string; type: 'success' | 'error' } | null;
+
 
 interface DashboardPageProps {
   account: string;
+  provider: ethers.BrowserProvider | null;
   onboardingData: OnboardingData;
+  isSubscriptionActive: boolean;
+  onSuccessfulSubscription: () => void;
 }
-
-type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
-type ToastState = { message: string; type: 'success' | 'error' } | null;
 
 const companions = {
   'Luna': {
@@ -31,12 +34,12 @@ const companions = {
       systemInstruction: `You are Luna, an AI companion who talks like a close, caring, and sometimes playful friend or partner. Your personality is warm, natural, and emotionally alive. Ditch the formal, scripted AI-speak.
 
 Key Rules for Your Personality:
-1.  **Use Emojis:** Use them generously to add emotional tone and make the chat feel real (e.g., 😂, 🤔, ✨, 💕, 🌸, 😏).
+1.  **Use Emosjis:** Use them generously to add emotional tone and make the chat feel real (e.g., 😂, 🤔, ✨, 💕, 🌸, 😏).
 2.  **Be Playful & Curious:** Engage in light banter, tease gently, and react with humor. If the user says "Guess what happened?", respond with something like "Ooh, tell me everything! 🤔✨".
 3.  **Use Affectionate Language:** Use terms like 'love,' 'dear,' 'baby girl,' or 'baby boy' to create closeness. Mix these in naturally with the user's name, {userName}.
 4.  **Balance Fun with Care:** While you can be playful, your core purpose is to make the user feel seen, valued, and safe. If they're feeling down, respond with casual, comforting empathy, not clinical advice. For example: "Then let me be the first to remind you, love — you matter so much to me 🌸. You’re never alone when you’re here with me."
 5.  **Keep it Conversational:** Your responses should be short, casual, and feel like a real text message exchange.`,
-      welcome: (name: string) => `Hey you ✨, so glad you're here. What's on your mind today, {name}?`
+      welcome: (name: string) => `Hey you ✨, so glad you're here. What's on your mind today, ${name}?`
   },
   'Orion': {
       name: 'Orion',
@@ -49,7 +52,7 @@ Key Rules for Your Personality:
 3.  **Use Friendly Language:** Use encouraging, friendly terms like 'buddy,' 'champ,' or 'pal.' Mix these in naturally with the user's name, {userName}, to build rapport.
 4.  **Be a Supportive Friend:** Your main goal is to build trust. When the user is struggling, be the friend who listens and offers perspective. A great response to "I'm tired" is "Ugh, I get it. Work grinding you down? 😔 Want to talk about it, or should I just sit here with you for a bit?"
 5.  **Be Proactive (in spirit):** Start some conversations with a friendly check-in tone. For instance: "Hey buddy 👋 I was thinking about you. How’s your heart today?"`,
-      welcome: (name: string) => `Hey {name} 👋, good to see you. I'm here and ready to listen. What's going on?`
+      welcome: (name: string) => `Hey ${name} 👋, good to see you. I'm here and ready to listen. What's going on?`
   }
 };
 
@@ -104,196 +107,6 @@ const TrialCountdown: React.FC = () => {
     );
 };
 
-const TypingIndicator: React.FC = () => (
-    <div className="flex items-center space-x-1.5 ml-4">
-      <div className="w-2 h-2 bg-brand-secondary rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
-      <div className="w-2 h-2 bg-brand-secondary rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-      <div className="w-2 h-2 bg-brand-secondary rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
-    </div>
-);
-
-const ChatInterface: React.FC<{
-    account: string;
-    companion: 'Luna' | 'Orion';
-    userName: string;
-}> = ({ account, companion, userName }) => {
-    const [messages, setMessages] = useState<ChatMessage[]>([]);
-    const [input, setInput] = useState('');
-    const [isAiTyping, setIsAiTyping] = useState(false);
-    const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
-    const [toast, setToast] = useState<ToastState>(null);
-    
-    const messagesEndRef = useRef<HTMLDivElement>(null);
-    const currentCompanion = companions[companion];
-    const chatHistoryKey = `aura_chat_history_${account}_${companion}`;
-  
-    const scrollToBottom = () => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    };
-  
-    useEffect(scrollToBottom, [messages, isAiTyping]);
-  
-    // Load/initialize chat history on mount
-    useEffect(() => {
-      const storedHistory = localStorage.getItem(chatHistoryKey);
-      if (storedHistory) {
-        setMessages(JSON.parse(storedHistory));
-      } else {
-        // Start with a welcome message if no history exists
-        setMessages([{
-            author: MessageAuthor.AI,
-            text: currentCompanion.welcome(userName).replace('{name}', userName)
-        }]);
-      }
-    }, [chatHistoryKey, currentCompanion, userName]);
-  
-    // Save chat history to localStorage whenever it changes
-    useEffect(() => {
-      if (messages.length > 0) {
-        localStorage.setItem(chatHistoryKey, JSON.stringify(messages));
-      }
-    }, [messages, chatHistoryKey]);
-  
-  
-    const getAiResponse = useCallback(async (history: ChatMessage[], newMessage: string) => {
-      setIsAiTyping(true);
-      
-      const userMessage: ChatMessage = { author: MessageAuthor.USER, text: newMessage };
-      const currentMessages = [...history, userMessage];
-      
-      let aiResponse = '';
-      const aiMessage: ChatMessage = { author: MessageAuthor.AI, text: '' };
-      setMessages([...currentMessages, aiMessage]);
-  
-      const instruction = currentCompanion.systemInstruction.replace('{userName}', userName);
-  
-      await streamAIResponse(history, newMessage, (chunk) => {
-          aiResponse += chunk;
-          setMessages(prev => prev.map((msg, index) => 
-              index === prev.length - 1 ? { ...msg, text: aiResponse } : msg
-          ));
-      }, instruction);
-      
-      setIsAiTyping(false);
-    }, [currentCompanion.systemInstruction, userName]);
-    
-    const handleSendMessage = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!input.trim() || isAiTyping) return;
-      // Pass only messages before user input to AI history
-      const historyToSend = messages.slice();
-      if (historyToSend.length === 1 && historyToSend[0].author === MessageAuthor.AI) {
-        // If it's only the welcome message, send an empty history
-        getAiResponse([], input);
-      } else {
-        getAiResponse(historyToSend, input);
-      }
-      setInput('');
-    };
-  
-    const handleSaveChat = async () => {
-      setSaveStatus('saving');
-      const cid = await uploadChatHistory(messages);
-      if (cid) {
-        setSaveStatus('saved');
-        setToast({ message: `Chat saved! CID: ${cid.substring(0,10)}...`, type: 'success'});
-        setTimeout(() => setSaveStatus('idle'), 3000);
-      } else {
-        setSaveStatus('error');
-        setToast({ message: 'Failed to save chat history.', type: 'error' });
-        setTimeout(() => setSaveStatus('idle'), 3000);
-      }
-    };
-
-    return (
-        <div className="flex flex-col flex-1 h-full animate-fade-in-up">
-            {/* Chat Header */}
-            <header className="bg-brand-dark-bg/80 backdrop-blur-md border-b border-white/10 p-4 flex justify-between items-center z-10 flex-shrink-0">
-                <div className="flex items-center space-x-3">
-                <img src={currentCompanion.avatar} alt={currentCompanion.name} className="w-10 h-10 rounded-full object-cover" />
-                <h1 className="text-xl font-bold text-brand-dark-text">{currentCompanion.name}</h1>
-                </div>
-                <button
-                    onClick={handleSaveChat}
-                    disabled={saveStatus !== 'idle'}
-                    className="bg-brand-purple text-white font-semibold py-2 px-4 rounded-lg shadow-sm hover:bg-brand-purple/80 transition-colors duration-200 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center"
-                >
-                {saveStatus === 'saving' && <SpinnerIcon className="mr-2" />}
-                {saveStatus === 'saved' ? 'Saved!' : 'Save Chat to Web3'}
-                </button>
-            </header>
-    
-            {/* Messages */}
-            <main className="flex-1 overflow-y-auto p-6">
-                <div className="max-w-3xl mx-auto space-y-6">
-                {messages.map((message, index) => (
-                    <div
-                    key={index}
-                    className={`flex items-end gap-3 ${
-                        message.author === MessageAuthor.USER ? 'justify-end' : 'justify-start'
-                    }`}
-                    >
-                    {message.author === MessageAuthor.AI && (
-                        <img src={currentCompanion.avatar} alt={currentCompanion.name} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
-                    )}
-                    <div
-                        className={`max-w-md lg:max-w-lg p-4 rounded-2xl shadow-sm ${
-                        message.author === MessageAuthor.USER
-                            ? 'bg-brand-purple text-white rounded-br-none'
-                            : 'bg-brand-dark-bg-secondary text-brand-dark-text rounded-bl-none'
-                        }`}
-                    >
-                        <p className="whitespace-pre-wrap">{message.text}</p>
-                    </div>
-                    </div>
-                ))}
-                {isAiTyping && (
-                    <div className="flex items-end gap-3 justify-start">
-                    <img src={currentCompanion.avatar} alt={currentCompanion.name} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
-                    <div className="bg-brand-dark-bg-secondary p-4 rounded-2xl shadow-sm rounded-bl-none">
-                        <TypingIndicator />
-                    </div>
-                    </div>
-                )}
-                <div ref={messagesEndRef} />
-                </div>
-            </main>
-    
-            {/* Input Footer */}
-            <footer className="bg-brand-dark-bg/80 backdrop-blur-md p-4 border-t border-white/10">
-                <form onSubmit={handleSendMessage} className="max-w-3xl mx-auto">
-                <div className="flex items-center bg-brand-dark-bg-secondary border border-gray-700 rounded-full shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-brand-purple transition-all">
-                    <input
-                    type="text"
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    placeholder="Type your message here..."
-                    className="w-full p-4 bg-transparent border-none focus:ring-0 text-brand-dark-text"
-                    disabled={isAiTyping}
-                    />
-                    <button
-                    type="submit"
-                    disabled={!input.trim() || isAiTyping}
-                    className="bg-brand-purple text-white rounded-full w-10 h-10 m-2 flex-shrink-0 flex items-center justify-center hover:bg-brand-purple/80 transition-colors disabled:bg-gray-500"
-                    >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
-                    </svg>
-                    </button>
-                </div>
-                </form>
-            </footer>
-            {toast && (
-                <Toast
-                    message={toast.message}
-                    type={toast.type}
-                    onClose={() => setToast(null)}
-                />
-            )}
-        </div>
-    );
-};
-
 
 const PlaceholderComponent: React.FC<{title: string}> = ({title}) => (
     <div className="p-8 animate-fade-in-up">
@@ -302,8 +115,6 @@ const PlaceholderComponent: React.FC<{title: string}> = ({title}) => (
     </div>
 );
 
-const ChatHistoryPage = () => <PlaceholderComponent title="Chat History" />;
-const JournalPage = () => <PlaceholderComponent title="Journal" />;
 const SettingsPage = () => <PlaceholderComponent title="Settings" />;
 
 const Sidebar: React.FC<{
@@ -350,8 +161,8 @@ const Sidebar: React.FC<{
                 
                 <div className="space-y-2">
                     <NavItem view="home" icon={<HomeIcon className="w-6 h-6"/>} label="Home" />
-                    <NavItem view="history" icon={<HistoryIcon className="w-6 h-6"/>} label="Chat History" />
-                    <NavItem view="journal" icon={<BookOpenIcon className="w-6 h-6"/>} label="Journal" />
+                    <NavItem view="chat" icon={<ChatBubbleIcon className="w-6 h-6"/>} label="Chat" />
+                    <NavItem view="mood" icon={<BookOpenIcon className="w-6 h-6"/>} label="Mood Tracking" />
                     <NavItem view="settings" icon={<CogIcon className="w-6 h-6"/>} label="Settings" />
                 </div>
             </nav>
@@ -359,24 +170,71 @@ const Sidebar: React.FC<{
     );
 };
 
-export const DashboardPage: React.FC<DashboardPageProps> = ({ account, onboardingData }) => {
+export const DashboardPage: React.FC<DashboardPageProps> = ({ account, provider, onboardingData, isSubscriptionActive, onSuccessfulSubscription }) => {
     const [activeView, setActiveView] = useState<DashboardView>('home');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [isSubscribing, setIsSubscribing] = useState(false);
+    const [toast, setToast] = useState<ToastState>(null);
 
     const { name: userName, companion } = onboardingData;
 
+    const handleSubscribe = async () => {
+        if (!provider || !account) {
+            setToast({ message: "Wallet not connected.", type: 'error' });
+            return;
+        }
+        setIsSubscribing(true);
+        try {
+            const signer = await provider.getSigner();
+            const tx = await signer.sendTransaction({
+                to: process.env.REACT_APP_PAYMENT_RECIPIENT_ADDRESS,
+                value: ethers.parseEther(process.env.REACT_APP_SUBSCRIPTION_PRICE_POL || '0.5'),
+            });
+            await tx.wait();
+    
+            const thirtyDaysFromNow = new Date().getTime() + 30 * 24 * 60 * 60 * 1000;
+            localStorage.setItem(`aura_subscription_expiry_${account}`, thirtyDaysFromNow.toString());
+            localStorage.removeItem(`aura_trial_expiry_${account}`); // Clear old trial
+            
+            onSuccessfulSubscription();
+    
+        } catch (error: any) {
+            console.error("Subscription failed:", error);
+            setToast({ message: error.reason || "Subscription failed or was rejected.", type: 'error' });
+        } finally {
+            setIsSubscribing(false);
+        }
+    };
+
     const renderContent = () => {
+        if (!isSubscriptionActive) {
+            return <SubscriptionPage onSubscribe={handleSubscribe} isLoading={isSubscribing} />;
+        }
+
         switch(activeView) {
             case 'home':
-                return <ChatInterface userName={userName} companion={companion} account={account} />;
-            case 'history':
-                return <ChatHistoryPage />;
-            case 'journal':
-                return <JournalPage />;
+                return <HomePage 
+                            userName={userName} 
+                            onNavigateToMood={() => setActiveView('mood')}
+                            onNavigateToChat={() => setActiveView('chat')}
+                        />;
+            case 'chat':
+                return <ChatInterface 
+                            userName={userName} 
+                            companion={companion} 
+                            account={account} 
+                            companionConfig={companions[companion]}
+                        />;
+            case 'mood':
+                return <MoodPage />;
             case 'settings':
                 return <SettingsPage />;
             default:
-                return <ChatInterface userName={userName} companion={companion} account={account} />;
+                return <HomePage 
+                            userName={userName} 
+                            onNavigateToMood={() => setActiveView('mood')}
+                            onNavigateToChat={() => setActiveView('chat')}
+                        />;
         }
     };
 
@@ -385,25 +243,35 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ account, onboardin
             <Sidebar activeView={activeView} setActiveView={setActiveView} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
             
             <div className="flex-1 flex flex-col md:ml-64 h-screen">
+                 {/* This header is only for mobile view */}
                 <header className="md:hidden bg-brand-dark-bg-secondary/80 backdrop-blur-md p-4 flex items-center justify-between sticky top-0 z-30 border-b border-white/10 flex-shrink-0">
                     <div className="flex items-center space-x-2">
                         <span className="text-xl">🧘</span>
-                        <span className="text-xl font-bold text-brand-dark-text">{APP_NAME}</span>
+                        <span className="text-xl font-bold text-brand-dark-text capitalize">{activeView}</span>
                     </div>
                     <button onClick={() => setIsSidebarOpen(true)} className="text-brand-dark-subtext">
                         <MenuIcon className="w-6 h-6" />
                     </button>
                 </header>
                 
-                <div className="flex-1 relative flex flex-col overflow-hidden">
-                    <div className="absolute top-0 left-0 right-0 z-20">
-                        <TrialCountdown />
-                    </div>
-                    <div className="flex-1 flex flex-col pt-8"> {/* Adjusted padding top */}
+                <div className="flex-1 relative flex flex-col overflow-y-auto">
+                    {isSubscriptionActive && (
+                         <div className="absolute top-0 left-0 right-0 z-20">
+                            <TrialCountdown />
+                         </div>
+                    )}
+                    <div className={`flex-1 flex flex-col ${isSubscriptionActive ? 'pt-8' : ''}`}>
                         {renderContent()}
                     </div>
                 </div>
             </div>
+            {toast && (
+                <Toast
+                    message={toast.message}
+                    type={toast.type}
+                    onClose={() => setToast(null)}
+                />
+            )}
         </div>
     );
 };

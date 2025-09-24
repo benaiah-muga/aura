@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
-import { APP_NAME, POLYGON_AMOY_CHAIN_ID, SUBSCRIPTION_PRICE_POL, PAYMENT_RECIPIENT_ADDRESS, POLYGON_AMOY_NETWORK_NAME, POLYGON_AMOY_RPC_URL, POLYGON_AMOY_CURRENCY_SYMBOL, TRIAL_DURATION_MS } from './constants';
+import { APP_NAME, POLYGON_AMOY_CHAIN_ID, TRIAL_DURATION_MS } from './constants';
 import { WalletIcon } from './components/icons/WalletIcon';
 import { CheckCircleIcon } from './components/icons/CheckCircleIcon';
 import { SpinnerIcon } from './components/icons/SpinnerIcon';
@@ -12,7 +12,7 @@ import { CoinIcon } from './components/icons/CoinIcon';
 import { OnboardingPage, OnboardingData } from './components/OnboardingPage';
 import { DashboardPage } from './components/DashboardPage';
 
-type View = 'landing' | 'connected' | 'subscription' | 'onboarding' | 'dashboard';
+type View = 'landing' | 'connected' | 'onboarding' | 'dashboard';
 type ToastState = { message: string; type: 'success' | 'error' } | null;
 
 const FeatureCard: React.FC<{icon: React.ReactNode, title: string, description: string}> = ({ icon, title, description }) => (
@@ -43,57 +43,6 @@ const ConnectedCard: React.FC<{ account: string; onProceed: () => void; }> = ({ 
 );
 
 
-// Subscription Page Component (defined within App.tsx to avoid creating new files)
-const SubscriptionPage: React.FC<{ onSubscribe: () => void; isLoading: boolean; }> = ({ onSubscribe, isLoading }) => {
-    const features = [
-        "Unlimited AI chat",
-        "Advanced mood tracking",
-        "Exclusive community access",
-        "Guided journaling prompts",
-    ];
-
-    return (
-        <div className="min-h-screen bg-brand-dark-bg text-brand-dark-text flex flex-col items-center justify-center p-4 animate-fade-in-up">
-            <div className="w-full max-w-sm bg-brand-dark-bg-secondary rounded-2xl shadow-2xl border border-white/10 overflow-hidden">
-                <img
-                    src="https://images.unsplash.com/photo-1611606042036-9a8e8b2d5f3b?q=80&w=1287&auto=format&fit=crop"
-                    alt="AI Companion"
-                    className="w-full h-48 object-cover"
-                />
-                <div className="p-8 text-left">
-                    <h2 className="text-3xl font-bold text-brand-dark-text mb-2">Unlock Your AI Mental Health Companion</h2>
-                    <p className="text-brand-dark-subtext mb-6">$20/month <span className="text-xs">(paid in {POLYGON_AMOY_CURRENCY_SYMBOL} on Polygon)</span></p>
-
-                    <ul className="space-y-3 mb-8">
-                        {features.map((feature, index) => (
-                            <li key={index} className="flex items-center">
-                                <CheckCircleIcon className="w-5 h-5 text-brand-dark-primary mr-3" />
-                                <span className="text-brand-dark-text">{feature}</span>
-                            </li>
-                        ))}
-                    </ul>
-
-                    <button
-                        onClick={onSubscribe}
-                        disabled={isLoading}
-                        className="w-full bg-brand-dark-primary text-white font-bold py-3 px-6 rounded-lg shadow-lg hover:bg-brand-dark-secondary transition-colors duration-300 flex items-center justify-center disabled:bg-gray-600 disabled:cursor-not-allowed"
-                    >
-                        {isLoading ? (
-                            <>
-                                <SpinnerIcon className="mr-2" />
-                                <span>Processing...</span>
-                            </>
-                        ) : (
-                            <span>Subscribe Now</span>
-                        )}
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-
 const App: React.FC = () => {
   const [view, setView] = useState<View>('landing');
   const [account, setAccount] = useState<string | null>(null);
@@ -101,63 +50,68 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [toast, setToast] = useState<ToastState>(null);
   const [onboardingData, setOnboardingData] = useState<OnboardingData | null>(null);
+  const [isSubscriptionActive, setIsSubscriptionActive] = useState(false);
 
-  const loadUserSession = (userAddress: string) => {
+  // Safely parse and validate data from localStorage
+  const loadAndValidateOnboardingData = (userAddress: string): OnboardingData | null => {
     const storedData = localStorage.getItem(`aura_onboarding_data_${userAddress}`);
-    if (storedData) {
-        try {
-            const parsedData = JSON.parse(storedData);
-            // Validate that the parsed data is an object with the required properties
-            if (parsedData && typeof parsedData === 'object' && 'name' in parsedData && 'companion' in parsedData) {
-                setOnboardingData(parsedData);
-                setView('dashboard');
-                return;
-            }
-            console.warn("Invalid onboarding data found in localStorage. Forcing re-onboarding.");
-            localStorage.removeItem(`aura_onboarding_data_${userAddress}`); // Clean up bad data
-        } catch (error) {
-            console.error("Failed to parse onboarding data from localStorage:", error);
-            localStorage.removeItem(`aura_onboarding_data_${userAddress}`); // Clean up bad data
+    if (!storedData) return null;
+
+    try {
+        const parsedData = JSON.parse(storedData);
+        if (parsedData && typeof parsedData === 'object' && 'name' in parsedData && 'companion' in parsedData) {
+            return parsedData;
         }
+        console.warn("Invalid onboarding data found in localStorage. Forcing re-onboarding.");
+        localStorage.removeItem(`aura_onboarding_data_${userAddress}`); // Clean up bad data
+    } catch (error) {
+        console.error("Failed to parse onboarding data from localStorage:", error);
+        localStorage.removeItem(`aura_onboarding_data_${userAddress}`); // Clean up bad data
     }
-    // If no stored data or if data was invalid, go to onboarding
-    setView('onboarding');
+    return null;
   };
-  
-  const checkAccessStatus = (userAddress: string) => {
+
+  const checkAccessStatus = useCallback((userAddress: string) => {
+    setIsLoading(true); // Show a brief loading state for a smoother transition
+
     const subExpiry = localStorage.getItem(`aura_subscription_expiry_${userAddress}`);
     const trialExpiry = localStorage.getItem(`aura_trial_expiry_${userAddress}`);
+    let hasAccess = false;
 
     // 1. Check for an active subscription
     if (subExpiry && new Date().getTime() < parseInt(subExpiry, 10)) {
         console.log("Active subscription found.");
-        loadUserSession(userAddress);
-        return;
+        hasAccess = true;
     }
-
     // 2. Check for an active trial
-    if (trialExpiry && new Date().getTime() < parseInt(trialExpiry, 10)) {
+    else if (trialExpiry && new Date().getTime() < parseInt(trialExpiry, 10)) {
         console.log("Active trial found.");
-        loadUserSession(userAddress);
-        return;
+        hasAccess = true;
     }
-
-    // 3. Check if trial has expired
-    if (trialExpiry && new Date().getTime() >= parseInt(trialExpiry, 10)) {
-        console.log("Trial has expired.");
-        setView('subscription');
-        return;
+    // 3. New user or expired user -> Start a new trial if no trial has ever been set
+    else if (!trialExpiry) {
+        console.log("No active subscription or trial. Starting a new 3-day trial.");
+        const newTrialExpiry = new Date().getTime() + TRIAL_DURATION_MS;
+        localStorage.setItem(`aura_trial_expiry_${userAddress}`, newTrialExpiry.toString());
+        setToast({ message: "Welcome! Your 3-day free trial has started.", type: 'success' });
+        hasAccess = true;
+    } else {
+        console.log("Subscription and trial have expired.");
+        hasAccess = false;
     }
+    
+    setIsSubscriptionActive(hasAccess);
 
-    // 4. New user or existing user without trial -> Start a new trial
-    console.log("No active subscription or trial. Starting a new 3-day trial.");
-    const newTrialExpiry = new Date().getTime() + TRIAL_DURATION_MS;
-    localStorage.setItem(`aura_trial_expiry_${userAddress}`, newTrialExpiry.toString());
-    setToast({ message: "Welcome! Your 3-day free trial has started.", type: 'success' });
-
-    // Check for grandfathered data, otherwise start fresh onboarding
-    loadUserSession(userAddress);
-  };
+    const loadedData = loadAndValidateOnboardingData(userAddress);
+    if (loadedData) {
+        setOnboardingData(loadedData);
+        setView('dashboard');
+    } else {
+        setView('onboarding');
+    }
+    
+    setIsLoading(false);
+  }, []);
 
 
   useEffect(() => {
@@ -165,7 +119,7 @@ const App: React.FC = () => {
       if (accounts.length === 0) {
         setAccount(null);
         setProvider(null);
-        setOnboardingData(null); // Clear data on disconnect
+        setOnboardingData(null);
         localStorage.removeItem('last_connected_account');
         setView('landing');
         setToast({ message: "Wallet disconnected.", type: 'success' });
@@ -207,6 +161,7 @@ const App: React.FC = () => {
 
       const network = await browserProvider.getNetwork();
       if (network.chainId !== BigInt(POLYGON_AMOY_CHAIN_ID)) {
+        setToast({ message: "Switching to Polygon Amoy...", type: 'success' });
         await switchNetwork(browserProvider);
       }
 
@@ -224,16 +179,21 @@ const App: React.FC = () => {
     try {
       await prov.send('wallet_switchEthereumChain', [{ chainId: POLYGON_AMOY_CHAIN_ID }]);
     } catch (switchError: any) {
+      // Standard error code for "user rejected the request"
+      if (switchError.code === 4001) {
+          throw new Error("You must switch to the Polygon Amoy network to continue.");
+      }
+      // Standard error code for "chain not added"
       if (switchError.code === 4902) {
         try {
           await prov.send('wallet_addEthereumChain', [
             {
               chainId: POLYGON_AMOY_CHAIN_ID,
-              chainName: POLYGON_AMOY_NETWORK_NAME,
-              rpcUrls: [POLYGON_AMOY_RPC_URL],
+              chainName: process.env.REACT_APP_POLYGON_AMOY_NETWORK_NAME,
+              rpcUrls: [process.env.REACT_APP_POLYGON_AMOY_RPC_URL],
               nativeCurrency: {
-                name: POLYGON_AMOY_CURRENCY_SYMBOL,
-                symbol: POLYGON_AMOY_CURRENCY_SYMBOL,
+                name: process.env.REACT_APP_POLYGON_AMOY_CURRENCY_SYMBOL,
+                symbol: process.env.REACT_APP_POLYGON_AMOY_CURRENCY_SYMBOL,
                 decimals: 18,
               },
             },
@@ -249,35 +209,6 @@ const App: React.FC = () => {
     }
   };
 
-  const handleSubscribe = async () => {
-    if (!provider || !account) {
-        setToast({ message: "Wallet not connected.", type: 'error' });
-        return;
-    }
-    setIsLoading(true);
-    try {
-        const signer = await provider.getSigner();
-        const tx = await signer.sendTransaction({
-            to: PAYMENT_RECIPIENT_ADDRESS,
-            value: ethers.parseEther(SUBSCRIPTION_PRICE_POL),
-        });
-        await tx.wait();
-
-        const thirtyDaysFromNow = new Date().getTime() + 30 * 24 * 60 * 60 * 1000;
-        localStorage.setItem(`aura_subscription_expiry_${account}`, thirtyDaysFromNow.toString());
-        localStorage.removeItem(`aura_trial_expiry_${account}`);
-
-        setToast({ message: "Subscription successful! Welcome back.", type: 'success' });
-        checkAccessStatus(account);
-
-    } catch (error: any) {
-        console.error("Subscription failed:", error);
-        setToast({ message: error.reason || "Subscription failed or was rejected.", type: 'error' });
-    } finally {
-        setIsLoading(false);
-    }
-  };
-
   const handleOnboardingComplete = (data: OnboardingData) => {
     if (!account) return;
     localStorage.setItem(`aura_onboarding_data_${account}`, JSON.stringify(data));
@@ -285,6 +216,13 @@ const App: React.FC = () => {
     setView('dashboard');
     setToast({ message: "Setup complete. Welcome to your safe space.", type: 'success' });
   };
+  
+  const handleSuccessfulSubscription = () => {
+    if (!account) return;
+    setToast({ message: "Subscription successful! Welcome back.", type: 'success' });
+    checkAccessStatus(account); // Re-check access to update state and UI
+  };
+
 
   const renderLandingPage = () => (
     <div className="min-h-screen bg-brand-dark-bg text-brand-dark-text font-sans flex flex-col">
@@ -367,16 +305,22 @@ const App: React.FC = () => {
             return renderLandingPage();
         case 'connected':
             return account ? <ConnectedCard account={account} onProceed={() => checkAccessStatus(account)} /> : renderLandingPage();
-        case 'subscription':
-            return <SubscriptionPage onSubscribe={handleSubscribe} isLoading={isLoading} />;
         case 'onboarding':
             return <OnboardingPage onComplete={handleOnboardingComplete} />;
         case 'dashboard':
             if (account && onboardingData) {
-                return <DashboardPage account={account} onboardingData={onboardingData} />;
+                return (
+                    <DashboardPage
+                        account={account}
+                        provider={provider}
+                        onboardingData={onboardingData}
+                        isSubscriptionActive={isSubscriptionActive}
+                        onSuccessfulSubscription={handleSuccessfulSubscription}
+                    />
+                );
             }
             // Add a loading state to prevent flickering to the landing page
-            // while onboardingData is being set.
+            // while data is being loaded and validated.
             return (
                 <div className="min-h-screen bg-brand-dark-bg flex items-center justify-center">
                     <SpinnerIcon className="w-16 h-16 text-brand-dark-primary" />
