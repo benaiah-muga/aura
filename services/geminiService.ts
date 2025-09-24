@@ -12,8 +12,6 @@ const GEMINI_API_KEY: string = 'AIzaSyCK4Tlo_7-Joo6T9Ea6zjjNrBqka4YVor8';
 
 const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
-const SYSTEM_INSTRUCTION = `You are AURA, a caring and supportive AI mental health companion. Your purpose is to provide a safe, non-judgmental space for users to express their thoughts and feelings. Respond with empathy, kindness, and encouragement. Keep your responses concise and conversational. Do not provide medical advice, but you can suggest seeking professional help if a user's situation seems serious. Your tone should be warm and calming.`;
-
 // Correctly format chat history for the Gemini API.
 // The `history` property of `ai.chats.create` expects an array of `Content` objects.
 const convertToGeminiHistory = (messages: ChatMessage[]): Content[] => {
@@ -24,7 +22,7 @@ const convertToGeminiHistory = (messages: ChatMessage[]): Content[] => {
 };
 
 
-export const streamAIResponse = async (history: ChatMessage[], newMessage: string, onChunk: (text: string) => void) => {
+export const streamAIResponse = async (history: ChatMessage[], newMessage: string, onChunk: (text: string) => void, systemInstruction: string) => {
     try {
         if (!GEMINI_API_KEY || GEMINI_API_KEY === 'YOUR_GEMINI_KEY_HERE') {
             onChunk("AI functionality is currently disabled. The API key is not configured.");
@@ -37,7 +35,7 @@ export const streamAIResponse = async (history: ChatMessage[], newMessage: strin
             model: GEMINI_MODEL_NAME,
             history: geminiHistory,
             config: {
-                systemInstruction: SYSTEM_INSTRUCTION,
+                systemInstruction: systemInstruction,
             }
         });
 

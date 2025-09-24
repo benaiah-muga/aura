@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
-import { APP_NAME, APP_TAGLINE, POLYGON_AMOY_CHAIN_ID, PAYMENT_AMOUNT, PAYMENT_RECIPIENT_ADDRESS, POLYGON_AMOY_NETWORK_NAME, POLYGON_AMOY_RPC_URL, POLYGON_AMOY_CURRENCY_SYMBOL } from './constants';
+import { APP_NAME, POLYGON_AMOY_CHAIN_ID, PAYMENT_AMOUNT, PAYMENT_RECIPIENT_ADDRESS, POLYGON_AMOY_NETWORK_NAME, POLYGON_AMOY_RPC_URL, POLYGON_AMOY_CURRENCY_SYMBOL } from './constants';
 import { WalletIcon } from './components/icons/WalletIcon';
 import { CheckCircleIcon } from './components/icons/CheckCircleIcon';
 import { SpinnerIcon } from './components/icons/SpinnerIcon';
@@ -10,8 +10,9 @@ import { ChatBubbleIcon } from './components/icons/ChatBubbleIcon';
 import { ShieldIcon } from './components/icons/ShieldIcon';
 import { CoinIcon } from './components/icons/CoinIcon';
 import { OnboardingPage, OnboardingData } from './components/OnboardingPage';
+import { DashboardPage } from './components/DashboardPage';
 
-type View = 'landing' | 'payment' | 'onboarding' | 'chat';
+type View = 'landing' | 'payment' | 'onboarding' | 'dashboard' | 'chat';
 type ToastState = { message: string; type: 'success' | 'error' } | null;
 
 const FeatureCard: React.FC<{icon: React.ReactNode, title: string, description: string}> = ({ icon, title, description }) => (
@@ -31,6 +32,9 @@ const App: React.FC = () => {
   const [provider, setProvider] = useState<ethers.BrowserProvider | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [toast, setToast] = useState<ToastState>(null);
+  const [onboardingData, setOnboardingData] = useState<OnboardingData | null>(null);
+  const [selectedCompanion, setSelectedCompanion] = useState<'Luna' | 'Orion'>('Luna');
+  const [initialMessage, setInitialMessage] = useState<string>('');
 
   const checkWalletConnection = useCallback(async () => {
     if (window.ethereum) {
@@ -169,10 +173,16 @@ const App: React.FC = () => {
     // In a real app, you might encrypt and store this data using Lighthouse.
     console.log("Onboarding complete:", data);
     localStorage.setItem(`aura_onboarding_completed_${account}`, 'true');
-    setView('chat');
+    setOnboardingData(data);
+    setView('dashboard');
     setToast({ message: "Setup complete. Welcome to your safe space.", type: 'success' });
   };
 
+  const handleStartChat = (companion: 'Luna' | 'Orion', message: string) => {
+    setSelectedCompanion(companion);
+    setInitialMessage(message);
+    setView('chat');
+  };
 
   const renderLandingPage = () => (
     <div className="min-h-screen bg-brand-dark-bg text-brand-dark-text font-sans flex flex-col">
@@ -184,7 +194,7 @@ const App: React.FC = () => {
               Meet <span className="text-brand-dark-primary">{APP_NAME}</span>, Your Personal AI Companion
             </h1>
             <p className="text-lg md:text-xl text-brand-dark-subtext max-w-xl mx-auto md:mx-0">
-              {APP_TAGLINE}. Find a safe space to talk, reflect, and grow, with the privacy and ownership of Web3.
+              Find a safe space to talk, reflect, and grow, with the privacy and ownership of Web3.
             </p>
             <div className="flex justify-center md:justify-start">
               <button
@@ -289,8 +299,17 @@ const App: React.FC = () => {
             return renderPaymentPage();
         case 'onboarding':
             return <OnboardingPage onComplete={handleOnboardingComplete} />;
+        case 'dashboard':
+            return <DashboardPage userName={onboardingData?.name || 'friend'} onStartChat={handleStartChat} />;
         case 'chat':
-            return account ? <ChatPage account={account} /> : renderLandingPage();
+            return account && onboardingData ? (
+                <ChatPage 
+                    account={account} 
+                    companion={selectedCompanion} 
+                    userName={onboardingData.name}
+                    initialUserMessage={initialMessage}
+                />
+            ) : renderLandingPage();
         default:
             return renderLandingPage();
     }
