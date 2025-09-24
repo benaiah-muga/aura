@@ -14,7 +14,6 @@ interface ChatInterfaceProps {
   userName: string;
   companionConfig: {
     name: string;
-    avatar: string;
     descriptor: string;
     systemInstruction: string;
     welcome: (name: string) => string;
@@ -31,6 +30,16 @@ const TypingIndicator: React.FC = () => (
       <div className="w-2 h-2 bg-brand-secondary rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
     </div>
 );
+
+const CompanionAvatar: React.FC<{ name: string, className?: string }> = ({ name, className = "w-8 h-8" }) => {
+    const initial = name ? name.charAt(0).toUpperCase() : 'A';
+    const sizeClasses = className.includes('w-10') ? 'text-xl' : 'text-sm';
+    return (
+        <div className={`relative inline-flex items-center justify-center overflow-hidden bg-brand-purple rounded-full flex-shrink-0 ${className}`}>
+            <span className={`font-medium text-white ${sizeClasses}`}>{initial}</span>
+        </div>
+    );
+};
 
 export const ChatInterface: React.FC<ChatInterfaceProps> = ({ account, companion, userName, companionConfig }) => {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -122,7 +131,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ account, companion
             <div className="flex flex-col flex-1 min-w-0 h-full bg-brand-dark-bg-secondary/50 border border-white/10 rounded-2xl shadow-lg">
                 <header className="bg-brand-dark-bg/80 backdrop-blur-md p-4 flex justify-between items-center z-10 flex-shrink-0 rounded-t-2xl border-b border-white/10">
                     <div className="flex items-center space-x-3">
-                        <img src={companionConfig.avatar} alt={companionConfig.name} className="w-10 h-10 rounded-full object-cover lg:hidden" />
+                        <CompanionAvatar name={companionConfig.name} className="w-10 h-10 lg:hidden" />
                         <h1 className="text-xl font-bold text-brand-dark-text lg:hidden">{companionConfig.name}</h1>
                         <h1 className="hidden lg:block text-xl font-bold text-brand-dark-text">Conversation</h1>
                     </div>
@@ -146,7 +155,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ account, companion
                         }`}
                         >
                         {message.author === MessageAuthor.AI && (
-                            <img src={companionConfig.avatar} alt={companionConfig.name} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                           <CompanionAvatar name={companionConfig.name} />
                         )}
                         <div
                             className={`max-w-md lg:max-w-lg p-4 rounded-2xl shadow-sm ${
@@ -161,7 +170,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ account, companion
                     ))}
                     {isAiTyping && (
                         <div className="flex items-end gap-3 justify-start">
-                        <img src={companionConfig.avatar} alt={companionConfig.name} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                         <CompanionAvatar name={companionConfig.name} />
                         <div className="bg-brand-dark-bg-secondary p-4 rounded-2xl shadow-sm rounded-bl-none">
                             <TypingIndicator />
                         </div>

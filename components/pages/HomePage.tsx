@@ -1,6 +1,6 @@
 
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { HeartIcon } from '../icons/HeartIcon';
 import { ChatBubbleIcon } from '../icons/ChatBubbleIcon';
 import { ChevronRightIcon } from '../icons/ChevronRightIcon';
@@ -8,6 +8,7 @@ import { ChevronRightIcon } from '../icons/ChevronRightIcon';
 interface HomePageProps {
     userName: string;
     companion: 'Luna' | 'Orion';
+    subscriptionStatus: string;
     onNavigateToMood: () => void;
     onNavigateToChat: () => void;
 }
@@ -27,32 +28,8 @@ const WellnessStatCard: React.FC<{ title: string; value: string; change: string;
     </div>
 );
 
-export const HomePage: React.FC<HomePageProps> = ({ userName, companion, onNavigateToMood, onNavigateToChat }) => {
-    const [subscriptionStatus, setSubscriptionStatus] = useState('Loading...');
-
-    useEffect(() => {
-        const account = localStorage.getItem('last_connected_account');
-        if (!account) return;
-
-        const subExpiryStr = localStorage.getItem(`aura_subscription_expiry_${account}`);
-        if (subExpiryStr) {
-            const expiryDate = new Date(parseInt(subExpiryStr, 10));
-            setSubscriptionStatus(`Active Subscriber - Next renewal: ${expiryDate.toLocaleDateString()}`);
-        } else {
-            const trialExpiryStr = localStorage.getItem(`aura_trial_expiry_${account}`);
-            if (trialExpiryStr) {
-                 const expiryDate = new Date(parseInt(trialExpiryStr, 10));
-                if (expiryDate.getTime() > new Date().getTime()) {
-                    setSubscriptionStatus(`Trial active - Expires: ${expiryDate.toLocaleDateString()}`);
-                } else {
-                    setSubscriptionStatus('Trial Expired');
-                }
-            } else {
-                setSubscriptionStatus('No active subscription');
-            }
-        }
-    }, []);
-
+export const HomePage: React.FC<HomePageProps> = ({ userName, companion, subscriptionStatus, onNavigateToMood, onNavigateToChat }) => {
+    
     return (
         <div className="p-4 sm:p-8 animate-fade-in-up flex-1">
             <header className="mb-8">

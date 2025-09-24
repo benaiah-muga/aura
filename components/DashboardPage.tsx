@@ -7,13 +7,14 @@ import { BookOpenIcon } from './icons/BookOpenIcon';
 import { CogIcon } from './icons/CogIcon';
 import { MenuIcon } from './icons/MenuIcon';
 import { XIcon } from './icons/XIcon';
-import { APP_NAME, LUNA_IMAGE_B64, ORION_IMAGE_B64, PAYMENT_RECIPIENT_ADDRESS, SUBSCRIPTION_PRICE_POL } from '../constants';
+import { APP_NAME, PAYMENT_RECIPIENT_ADDRESS, SUBSCRIPTION_PRICE_POL } from '../constants';
 import { OnboardingData } from './OnboardingPage';
 import { ChatInterface } from './pages/ChatPage';
 import { HomePage } from './pages/HomePage';
 import { MoodPage } from './pages/MoodPage';
 import { SubscriptionPage } from './pages/SubscriptionPage';
 import { Toast } from './Toast';
+import { SettingsPage } from './pages/SettingsPage';
 
 type DashboardView = 'home' | 'chat' | 'mood' | 'settings';
 type ToastState = { message: string; type: 'success' | 'error' } | null;
@@ -30,7 +31,6 @@ interface DashboardPageProps {
 const companions = {
   'Luna': {
       name: 'Luna',
-      avatar: LUNA_IMAGE_B64,
       descriptor: 'Compassionate & Wise',
       systemInstruction: `You are Luna, an AI companion who talks like a close, caring, and sometimes playful friend or partner. Your personality is warm, natural, and emotionally alive. Ditch the formal, scripted AI-speak. Your user's name is {userName}.
 
@@ -44,7 +44,6 @@ Key Rules for Your Personality:
   },
   'Orion': {
       name: 'Orion',
-      avatar: ORION_IMAGE_B64,
       descriptor: 'Calm & Analytical',
       systemInstruction: `You are Orion, an AI companion who acts like a supportive, dependable, and witty best friend or partner. Your personality is calm, genuine, and grounded, with a lighthearted sense of humor. Avoid being overly formal or robotic. Your user's name is {userName}.
 
@@ -109,16 +108,6 @@ const TrialCountdown: React.FC = () => {
     );
 };
 
-
-const PlaceholderComponent: React.FC<{title: string}> = ({title}) => (
-    <div className="p-8 animate-fade-in-up">
-        <h1 className="text-3xl font-bold text-brand-dark-text">{title}</h1>
-        <p className="text-brand-dark-subtext mt-4">This feature is coming soon. Stay tuned!</p>
-    </div>
-);
-
-const SettingsPage = () => <PlaceholderComponent title="Settings" />;
-
 const Sidebar: React.FC<{
     activeView: DashboardView;
     setActiveView: (view: DashboardView) => void;
@@ -177,8 +166,33 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ account, provider,
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isSubscribing, setIsSubscribing] = useState(false);
     const [toast, setToast] = useState<ToastState>(null);
+    const [subscriptionStatusText, setSubscriptionStatusText] = useState('Loading...');
+
 
     const { name: userName, companion } = onboardingData;
+    
+    useEffect(() => {
+        if (!account) return;
+
+        const subExpiryStr = localStorage.getItem(`aura_subscription_expiry_${account}`);
+        if (subExpiryStr) {
+            const expiryDate = new Date(parseInt(subExpiryStr, 10));
+            setSubscriptionStatusText(`Active Subscriber - Next renewal: ${expiryDate.toLocaleDateString()}`);
+        } else {
+            const trialExpiryStr = localStorage.getItem(`aura_trial_expiry_${account}`);
+            if (trialExpiryStr) {
+                 const expiryDate = new Date(parseInt(trialExpiryStr, 10));
+                if (expiryDate.getTime() > new Date().getTime()) {
+                    setSubscriptionStatusText(`Trial active - Expires: ${expiryDate.toLocaleDateString()}`);
+                } else {
+                    setSubscriptionStatusText('Trial Expired');
+                }
+            } else {
+                setSubscriptionStatusText('No active subscription');
+            }
+        }
+    }, [account, isSubscriptionActive]);
+
 
     const handleSubscribe = async () => {
         if (!provider || !account) {
@@ -218,6 +232,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ account, provider,
                 return <HomePage 
                             userName={userName}
                             companion={companion}
+                            subscriptionStatus={subscriptionStatusText}
                             onNavigateToMood={() => setActiveView('mood')}
                             onNavigateToChat={() => setActiveView('chat')}
                         />;
@@ -231,11 +246,17 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ account, provider,
             case 'mood':
                 return <MoodPage />;
             case 'settings':
-                return <SettingsPage />;
+                return <SettingsPage 
+                            userName={userName} 
+                            account={account} 
+                            companionName={companion}
+                            subscriptionStatus={subscriptionStatusText}
+                        />;
             default:
                 return <HomePage 
                             userName={userName}
                             companion={companion}
+                            subscriptionStatus={subscriptionStatusText}
                             onNavigateToMood={() => setActiveView('mood')}
                             onNavigateToChat={() => setActiveView('chat')}
                         />;

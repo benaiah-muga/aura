@@ -1,7 +1,6 @@
 
 import React, { useState } from 'react';
 import { ArrowLeftIcon } from './icons/ArrowLeftIcon';
-import { LUNA_IMAGE_B64, ORION_IMAGE_B64 } from '../constants';
 import { CheckIcon } from './icons/CheckIcon';
 
 
@@ -34,12 +33,10 @@ const companions = {
     Luna: {
       name: 'Luna',
       descriptor: 'Compassionate & Wise',
-      avatar: LUNA_IMAGE_B64,
     },
     Orion: {
       name: 'Orion',
       descriptor: 'Calm & Analytical',
-      avatar: ORION_IMAGE_B64,
     }
 };
 
@@ -48,6 +45,7 @@ const CompanionCard: React.FC<{ name: 'Luna' | 'Orion'; isSelected: boolean; onS
     const baseClasses = "relative group flex flex-col items-center justify-center p-6 bg-brand-dark-bg rounded-2xl cursor-pointer transition-all duration-300 border-2";
     const selectedClasses = "border-brand-purple animate-glow";
     const unselectedClasses = "border-white/10 hover:border-white/20";
+    const initial = name.charAt(0).toUpperCase();
   
     return (
         <div onClick={onSelect} className={`${baseClasses} ${isSelected ? selectedClasses : unselectedClasses}`}>
@@ -56,18 +54,15 @@ const CompanionCard: React.FC<{ name: 'Luna' | 'Orion'; isSelected: boolean; onS
                     <CheckIcon className="w-4 h-4" />
                 </div>
             )}
-            <div className="w-full aspect-square rounded-xl mb-4 overflow-hidden relative">
-                <img 
-                    src={companion.avatar} 
-                    alt={companion.name} 
-                    className={`w-full h-full object-cover transition-transform duration-300 group-hover:scale-105`}
-                />
-                 <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
-                    <h3 className="text-2xl font-bold text-white shadow-xl">{companion.name}</h3>
-                    <p className="text-white/80 text-sm">{companion.descriptor}</p>
+             <div className="w-full aspect-square rounded-xl mb-4 flex items-center justify-center bg-brand-dark-bg/50">
+                <div className="relative inline-flex items-center justify-center w-28 h-28 sm:w-32 sm:h-32 overflow-hidden bg-brand-purple rounded-full transition-transform group-hover:scale-105">
+                    <span className="font-bold text-6xl text-white">{initial}</span>
                 </div>
             </div>
-           
+            <div className="text-center">
+                <h3 className="text-2xl font-bold text-brand-dark-text">{companion.name}</h3>
+                <p className="text-brand-dark-subtext text-sm">{companion.descriptor}</p>
+            </div>
         </div>
     );
 };
