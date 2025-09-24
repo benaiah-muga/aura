@@ -37,29 +37,68 @@ const App: React.FC = () => {
   const [selectedCompanion, setSelectedCompanion] = useState<'Luna' | 'Orion'>('Luna');
   const [initialMessage, setInitialMessage] = useState<string>('');
 
+  const checkSubscriptionAndOnboarding = useCallback((userAddress: string) => {
+    // 1. Check for an active subscription
+    const subExpiry = localStorage.getItem(`aura_subscription_expiry_${userAddress}`);
+    if (subExpiry && new Date().getTime() < parseInt(subExpiry, 10)) {
+        console.log("Active subscription found.");
+        const storedData = localStorage.getItem(`aura_onboarding_data_${userAddress}`);
+        if (storedData) {
+            setOnboardingData(JSON.parse(storedData));
+            setView('dashboard');
+        } else {
+            // This case happens if they paid but didn't finish onboarding
+            setView('onboarding');
+        }
+        return true;
+    }
+
+    // 2. Grandfather existing users: Check for old onboarding data
+    const storedOnboardingData = localStorage.getItem(`aura_onboarding_data_${userAddress}`);
+    if (storedOnboardingData) {
+        console.log("Grandfathering user. Granting complimentary 30-day pass.");
+        const thirtyDaysFromNow = new Date().getTime() + 30 * 24 * 60 * 60 * 1000;
+        localStorage.setItem(`aura_subscription_expiry_${userAddress}`, thirtyDaysFromNow.toString());
+        setOnboardingData(JSON.parse(storedOnboardingData));
+        setToast({ message: "As an existing user, you've received a 30-day pass!", type: 'success' });
+        setView('dashboard');
+        return true;
+    }
+
+    // 3. No subscription, no old data -> new user
+    console.log("No active subscription or existing data found.");
+    setView('payment');
+    return false;
+  }, []);
+
+
   const checkWalletConnection = useCallback(async () => {
     if (window.ethereum) {
       try {
         const browserProvider = new ethers.BrowserProvider(window.ethereum);
         const accounts = await browserProvider.listAccounts();
         if (accounts.length > 0) {
-          const signer = await browserProvider.getSigner();
-          const userAddress = signer.address;
+          const userAddress = accounts[0].address;
           setAccount(userAddress);
           setProvider(browserProvider);
           console.log("Wallet already connected:", userAddress);
-
-          // Check for existing onboarding data
-          const storedData = localStorage.getItem(`aura_onboarding_data_${userAddress}`);
-          if (storedData) {
-            setOnboardingData(JSON.parse(storedData));
-          }
+          checkSubscriptionAndOnboarding(userAddress);
         }
       } catch (error) {
-        console.error("Error checking wallet connection:", error);
+        // Fallback for wallets that don't support listAccounts without being connected
+        try {
+            if (window.ethereum.selectedAddress) {
+                setAccount(window.ethereum.selectedAddress);
+                setProvider(new ethers.BrowserProvider(window.ethereum));
+                checkSubscriptionAndOnboarding(window.ethereum.selectedAddress);
+            }
+        } catch (innerError) {
+             console.error("Error checking wallet connection:", innerError);
+        }
       }
     }
-  }, []);
+  }, [checkSubscriptionAndOnboarding]);
+
 
   useEffect(() => {
     checkWalletConnection();
@@ -72,8 +111,10 @@ const App: React.FC = () => {
         setView('landing');
         setToast({ message: "Wallet disconnected.", type: 'success' });
       } else {
-        setAccount(accounts[0]);
-        checkWalletConnection();
+        const newAddress = accounts[0];
+        setAccount(newAddress);
+        setProvider(new ethers.BrowserProvider(window.ethereum));
+        checkSubscriptionAndOnboarding(newAddress);
       }
     };
 
@@ -86,7 +127,7 @@ const App: React.FC = () => {
         window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
       }
     };
-  }, [checkWalletConnection]);
+  }, [checkWalletConnection, checkSubscriptionAndOnboarding]);
   
   const connectWallet = async () => {
     if (!window.ethereum) {
@@ -108,7 +149,7 @@ const App: React.FC = () => {
         await switchNetwork(browserProvider);
       }
       
-      setView('payment');
+      checkSubscriptionAndOnboarding(address);
       setToast({ message: `Wallet connected: ${address.substring(0, 6)}...`, type: 'success' });
     } catch (error: any) {
       console.error("Failed to connect wallet:", error);
@@ -161,15 +202,12 @@ const App: React.FC = () => {
         });
         await tx.wait();
 
-        const existingOnboardingData = localStorage.getItem(`aura_onboarding_data_${account}`);
-        if (existingOnboardingData) {
-            setOnboardingData(JSON.parse(existingOnboardingData));
-            setToast({ message: "Welcome back to Aura!", type: 'success' });
-            setView('dashboard');
-        } else {
-            setToast({ message: "Payment successful! Let's get you set up.", type: 'success' });
-            setView('onboarding');
-        }
+        const thirtyDaysFromNow = new Date().getTime() + 30 * 24 * 60 * 60 * 1000;
+        localStorage.setItem(`aura_subscription_expiry_${account}`, thirtyDaysFromNow.toString());
+
+        setToast({ message: "Payment successful! Let's get you set up.", type: 'success' });
+        setView('onboarding');
+
     } catch (error: any) {
         console.error("Payment failed:", error);
         setToast({ message: error.reason || "Payment failed or was rejected.", type: 'error' });
@@ -180,7 +218,6 @@ const App: React.FC = () => {
 
   const handleOnboardingComplete = (data: OnboardingData) => {
     if (!account) return;
-    // Persist the full onboarding data to localStorage
     localStorage.setItem(`aura_onboarding_data_${account}`, JSON.stringify(data));
     setOnboardingData(data);
     setView('dashboard');
@@ -256,7 +293,7 @@ const App: React.FC = () => {
                  <FeatureCard 
                     icon={<CoinIcon className="w-8 h-8"/>}
                     title="Simple Web3 Onboarding"
-                    description="A one-time, low-cost payment on the Polygon network grants you lifetime access. No subscriptions, full ownership."
+                    description="A low-cost payment on the Polygon network grants you access. No hidden fees, full ownership of your data."
                 />
             </div>
         </div>
@@ -277,7 +314,7 @@ const App: React.FC = () => {
             <h2 className="text-2xl font-bold text-brand-dark-text mb-2">Wallet Connected!</h2>
             <p className="text-brand-dark-subtext mb-6 break-words">Account: {account}</p>
             <div className="bg-brand-dark-bg p-4 rounded-lg mb-6 border border-white/10">
-                <p className="text-sm text-brand-dark-subtext">One-Time Access Fee</p>
+                <p className="text-sm text-brand-dark-subtext">30-Day Access Fee</p>
                 <p className="text-3xl font-bold text-brand-dark-text">{PAYMENT_AMOUNT} {POLYGON_AMOY_CURRENCY_SYMBOL}</p>
             </div>
             <button

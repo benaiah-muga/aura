@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { streamAIResponse } from '../services/geminiService';
 import { uploadChatHistory } from '../services/web3storageService';
 import { ChatMessage, MessageAuthor } from '../types';
@@ -46,6 +47,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ account, companion, userName
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const currentCompanion = companionConfig[companion];
+  const chatHistoryKey = `aura_chat_history_${account}_${companion}`;
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -53,7 +55,26 @@ export const ChatPage: React.FC<ChatPageProps> = ({ account, companion, userName
 
   useEffect(scrollToBottom, [messages, isAiTyping]);
 
-  const getAiResponse = async (history: ChatMessage[], newMessage: string) => {
+  // Load chat history from localStorage on mount
+  useEffect(() => {
+    const storedHistory = localStorage.getItem(chatHistoryKey);
+    if (storedHistory) {
+      setMessages(JSON.parse(storedHistory));
+    } else if (initialUserMessage) {
+      // Only use initial message if there's no history
+      getAiResponse([], initialUserMessage);
+    }
+  }, [initialUserMessage, chatHistoryKey]);
+
+  // Save chat history to localStorage whenever it changes
+  useEffect(() => {
+    if (messages.length > 0) {
+      localStorage.setItem(chatHistoryKey, JSON.stringify(messages));
+    }
+  }, [messages, chatHistoryKey]);
+
+
+  const getAiResponse = useCallback(async (history: ChatMessage[], newMessage: string) => {
     setIsAiTyping(true);
     
     const userMessage: ChatMessage = { author: MessageAuthor.USER, text: newMessage };
@@ -73,13 +94,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ account, companion, userName
     }, instruction);
     
     setIsAiTyping(false);
-  };
-
-  useEffect(() => {
-    if (initialUserMessage) {
-        getAiResponse([], initialUserMessage);
-    }
-  }, [initialUserMessage]);
+  }, [currentCompanion.systemInstruction, userName]);
   
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -170,7 +185,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ account, companion, userName
               disabled={!input.trim() || isAiTyping}
               className="bg-brand-purple text-white rounded-full w-10 h-10 m-2 flex-shrink-0 flex items-center justify-center hover:bg-brand-purple/80 transition-colors disabled:bg-gray-500"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <svg xmlns="http://www.w.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
               </svg>
             </button>
