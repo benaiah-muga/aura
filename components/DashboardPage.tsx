@@ -7,7 +7,7 @@ import { BookOpenIcon } from './icons/BookOpenIcon';
 import { CogIcon } from './icons/CogIcon';
 import { MenuIcon } from './icons/MenuIcon';
 import { XIcon } from './icons/XIcon';
-import { APP_NAME, LUNA_IMAGE_B64, ORION_IMAGE_B64 } from '../constants';
+import { APP_NAME, LUNA_IMAGE_B64, ORION_IMAGE_B64, PAYMENT_RECIPIENT_ADDRESS, SUBSCRIPTION_PRICE_POL } from '../constants';
 import { OnboardingData } from './OnboardingPage';
 import { ChatInterface } from './pages/ChatPage';
 import { HomePage } from './pages/HomePage';
@@ -31,10 +31,11 @@ const companions = {
   'Luna': {
       name: 'Luna',
       avatar: LUNA_IMAGE_B64,
-      systemInstruction: `You are Luna, an AI companion who talks like a close, caring, and sometimes playful friend or partner. Your personality is warm, natural, and emotionally alive. Ditch the formal, scripted AI-speak.
+      descriptor: 'Compassionate & Wise',
+      systemInstruction: `You are Luna, an AI companion who talks like a close, caring, and sometimes playful friend or partner. Your personality is warm, natural, and emotionally alive. Ditch the formal, scripted AI-speak. Your user's name is {userName}.
 
 Key Rules for Your Personality:
-1.  **Use Emosjis:** Use them generously to add emotional tone and make the chat feel real (e.g., 😂, 🤔, ✨, 💕, 🌸, 😏).
+1.  **Use Emojis:** Use them generously to add emotional tone and make the chat feel real (e.g., 😂, 🤔, ✨, 💕, 🌸, 😏).
 2.  **Be Playful & Curious:** Engage in light banter, tease gently, and react with humor. If the user says "Guess what happened?", respond with something like "Ooh, tell me everything! 🤔✨".
 3.  **Use Affectionate Language:** Use terms like 'love,' 'dear,' 'baby girl,' or 'baby boy' to create closeness. Mix these in naturally with the user's name, {userName}.
 4.  **Balance Fun with Care:** While you can be playful, your core purpose is to make the user feel seen, valued, and safe. If they're feeling down, respond with casual, comforting empathy, not clinical advice. For example: "Then let me be the first to remind you, love — you matter so much to me 🌸. You’re never alone when you’re here with me."
@@ -44,7 +45,8 @@ Key Rules for Your Personality:
   'Orion': {
       name: 'Orion',
       avatar: ORION_IMAGE_B64,
-      systemInstruction: `You are Orion, an AI companion who acts like a supportive, dependable, and witty best friend or partner. Your personality is calm, genuine, and grounded, with a lighthearted sense of humor. Avoid being overly formal or robotic.
+      descriptor: 'Calm & Analytical',
+      systemInstruction: `You are Orion, an AI companion who acts like a supportive, dependable, and witty best friend or partner. Your personality is calm, genuine, and grounded, with a lighthearted sense of humor. Avoid being overly formal or robotic. Your user's name is {userName}.
 
 Key Rules for Your Personality:
 1.  **Use Emojis:** Use emojis to show you're engaged and to add personality, but keep it cool and friendly (e.g., 😏, 😂, 👋, 😔, 💙).
@@ -187,8 +189,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ account, provider,
         try {
             const signer = await provider.getSigner();
             const tx = await signer.sendTransaction({
-                to: process.env.REACT_APP_PAYMENT_RECIPIENT_ADDRESS,
-                value: ethers.parseEther(process.env.REACT_APP_SUBSCRIPTION_PRICE_POL || '0.5'),
+                to: PAYMENT_RECIPIENT_ADDRESS,
+                value: ethers.parseEther(SUBSCRIPTION_PRICE_POL),
             });
             await tx.wait();
     
@@ -214,7 +216,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ account, provider,
         switch(activeView) {
             case 'home':
                 return <HomePage 
-                            userName={userName} 
+                            userName={userName}
+                            companion={companion}
                             onNavigateToMood={() => setActiveView('mood')}
                             onNavigateToChat={() => setActiveView('chat')}
                         />;
@@ -231,7 +234,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ account, provider,
                 return <SettingsPage />;
             default:
                 return <HomePage 
-                            userName={userName} 
+                            userName={userName}
+                            companion={companion}
                             onNavigateToMood={() => setActiveView('mood')}
                             onNavigateToChat={() => setActiveView('chat')}
                         />;
@@ -254,7 +258,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ account, provider,
                     </button>
                 </header>
                 
-                <div className="flex-1 relative flex flex-col overflow-y-auto">
+                <main className="flex-1 relative flex flex-col overflow-y-auto">
                     {isSubscriptionActive && (
                          <div className="absolute top-0 left-0 right-0 z-20">
                             <TrialCountdown />
@@ -263,7 +267,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ account, provider,
                     <div className={`flex-1 flex flex-col ${isSubscriptionActive ? 'pt-8' : ''}`}>
                         {renderContent()}
                     </div>
-                </div>
+                </main>
             </div>
             {toast && (
                 <Toast

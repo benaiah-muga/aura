@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useState } from 'react';
 import { HeartIcon } from '../icons/HeartIcon';
 import { ChatBubbleIcon } from '../icons/ChatBubbleIcon';
@@ -6,6 +7,7 @@ import { ChevronRightIcon } from '../icons/ChevronRightIcon';
 
 interface HomePageProps {
     userName: string;
+    companion: 'Luna' | 'Orion';
     onNavigateToMood: () => void;
     onNavigateToChat: () => void;
 }
@@ -25,7 +27,7 @@ const WellnessStatCard: React.FC<{ title: string; value: string; change: string;
     </div>
 );
 
-export const HomePage: React.FC<HomePageProps> = ({ userName, onNavigateToMood, onNavigateToChat }) => {
+export const HomePage: React.FC<HomePageProps> = ({ userName, companion, onNavigateToMood, onNavigateToChat }) => {
     const [subscriptionStatus, setSubscriptionStatus] = useState('Loading...');
 
     useEffect(() => {
@@ -81,8 +83,8 @@ export const HomePage: React.FC<HomePageProps> = ({ userName, onNavigateToMood, 
                             <ChatBubbleIcon className="w-6 h-6"/>
                         </div>
                         <div>
-                            <p className="font-bold text-brand-dark-text">AI Chat Support</p>
-                            <p className="text-sm text-brand-dark-subtext">Chat with our AI assistant</p>
+                            <p className="font-bold text-brand-dark-text">AI Companion</p>
+                            <p className="text-sm text-brand-dark-subtext">Chat with {companion}</p>
                         </div>
                     </div>
                     <ChevronRightIcon className="w-6 h-6 text-brand-dark-subtext" />

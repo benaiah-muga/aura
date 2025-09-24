@@ -3,7 +3,7 @@ import React from 'react';
 import { CheckCircleIcon } from '../icons/CheckCircleIcon';
 import { SpinnerIcon } from '../icons/SpinnerIcon';
 import { POLYGON_AMOY_CURRENCY_SYMBOL } from '../../constants';
-import { ORION_IMAGE_B64 } from '../../constants';
+import { LUNA_IMAGE_B64 } from '../../constants';
 
 interface SubscriptionPageProps {
   onSubscribe: () => void;
@@ -22,12 +22,12 @@ export const SubscriptionPage: React.FC<SubscriptionPageProps> = ({ onSubscribe,
         <div className="min-h-full w-full flex flex-col items-center justify-center p-4 animate-fade-in-up bg-brand-dark-bg text-brand-dark-text">
             <div className="w-full max-w-sm bg-brand-dark-bg-secondary rounded-2xl shadow-2xl border border-white/10 overflow-hidden">
                 <img
-                    src={ORION_IMAGE_B64} // Using a companion image for better branding
+                    src={LUNA_IMAGE_B64} // Using Luna's image for better branding, as per the design mockup
                     alt="AI Companion"
                     className="w-full h-48 object-cover"
                 />
                 <div className="p-8 text-left">
-                    <h2 className="text-3xl font-bold text-brand-dark-text mb-2">Unlock Your AI Companion</h2>
+                    <h2 className="text-3xl font-bold text-brand-dark-text mb-2">Unlock Your AI Mental Health Companion</h2>
                     <p className="text-brand-dark-subtext mb-6">$20/month <span className="text-xs">(paid in {POLYGON_AMOY_CURRENCY_SYMBOL} on Polygon)</span></p>
 
                     <ul className="space-y-3 mb-8">
