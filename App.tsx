@@ -9,8 +9,9 @@ import { Toast } from './components/Toast';
 import { ChatBubbleIcon } from './components/icons/ChatBubbleIcon';
 import { ShieldIcon } from './components/icons/ShieldIcon';
 import { CoinIcon } from './components/icons/CoinIcon';
+import { OnboardingPage, OnboardingData } from './components/OnboardingPage';
 
-type View = 'landing' | 'payment' | 'chat';
+type View = 'landing' | 'payment' | 'onboarding' | 'chat';
 type ToastState = { message: string; type: 'success' | 'error' } | null;
 
 const FeatureCard: React.FC<{icon: React.ReactNode, title: string, description: string}> = ({ icon, title, description }) => (
@@ -146,8 +147,15 @@ const App: React.FC = () => {
             value: ethers.parseEther(PAYMENT_AMOUNT),
         });
         await tx.wait();
-        setToast({ message: "Payment successful! Welcome to Aura.", type: 'success' });
-        setView('chat');
+
+        const isOnboardingComplete = localStorage.getItem(`aura_onboarding_completed_${account}`);
+        if (isOnboardingComplete) {
+            setToast({ message: "Welcome back to Aura!", type: 'success' });
+            setView('chat');
+        } else {
+            setToast({ message: "Payment successful! Let's get you set up.", type: 'success' });
+            setView('onboarding');
+        }
     } catch (error: any) {
         console.error("Payment failed:", error);
         setToast({ message: error.reason || "Payment failed or was rejected.", type: 'error' });
@@ -155,6 +163,16 @@ const App: React.FC = () => {
         setIsLoading(false);
     }
   };
+
+  const handleOnboardingComplete = (data: OnboardingData) => {
+    if (!account) return;
+    // In a real app, you might encrypt and store this data using Lighthouse.
+    console.log("Onboarding complete:", data);
+    localStorage.setItem(`aura_onboarding_completed_${account}`, 'true');
+    setView('chat');
+    setToast({ message: "Setup complete. Welcome to your safe space.", type: 'success' });
+  };
+
 
   const renderLandingPage = () => (
     <div className="min-h-screen bg-brand-dark-bg text-brand-dark-text font-sans flex flex-col">
@@ -264,13 +282,18 @@ const App: React.FC = () => {
 
 
   const renderContent = () => {
-    if (view === 'chat' && account) {
-      return <ChatPage account={account} />;
+    switch (view) {
+        case 'landing':
+            return renderLandingPage();
+        case 'payment':
+            return renderPaymentPage();
+        case 'onboarding':
+            return <OnboardingPage onComplete={handleOnboardingComplete} />;
+        case 'chat':
+            return account ? <ChatPage account={account} /> : renderLandingPage();
+        default:
+            return renderLandingPage();
     }
-    if (view === 'payment' && account) {
-        return renderPaymentPage();
-    }
-    return renderLandingPage();
   };
 
   return (

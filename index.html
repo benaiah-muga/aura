@@ -33,6 +33,7 @@
                 'fade-in-up': 'fade-in-up 0.5s ease-out forwards',
                 'subtle-pulse': 'subtle-pulse 2s infinite ease-in-out',
                 'spin-slow': 'spin 15s linear infinite',
+                'slide-in-from-right': 'slide-in-from-right 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards',
             },
             keyframes: {
                 'fade-in-up': {
@@ -42,7 +43,11 @@
                 'subtle-pulse': {
                     '0%, 100%': { transform: 'scale(1)' },
                     '50%': { transform: 'scale(1.02)' },
-                }
+                },
+                'slide-in-from-right': {
+                  '0%': { transform: 'translateX(100%)', opacity: '0.5' },
+                  '100%': { transform: 'translateX(0)', opacity: '1' },
+                },
             }
           }
         }
