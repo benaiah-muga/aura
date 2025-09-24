@@ -72,37 +72,7 @@ const App: React.FC = () => {
   }, []);
 
 
-  const checkWalletConnection = useCallback(async () => {
-    if (window.ethereum) {
-      try {
-        const browserProvider = new ethers.BrowserProvider(window.ethereum);
-        const accounts = await browserProvider.listAccounts();
-        if (accounts.length > 0) {
-          const userAddress = accounts[0].address;
-          setAccount(userAddress);
-          setProvider(browserProvider);
-          console.log("Wallet already connected:", userAddress);
-          checkSubscriptionAndOnboarding(userAddress);
-        }
-      } catch (error) {
-        // Fallback for wallets that don't support listAccounts without being connected
-        try {
-            if (window.ethereum.selectedAddress) {
-                setAccount(window.ethereum.selectedAddress);
-                setProvider(new ethers.BrowserProvider(window.ethereum));
-                checkSubscriptionAndOnboarding(window.ethereum.selectedAddress);
-            }
-        } catch (innerError) {
-             console.error("Error checking wallet connection:", innerError);
-        }
-      }
-    }
-  }, [checkSubscriptionAndOnboarding]);
-
-
   useEffect(() => {
-    checkWalletConnection();
-    
     const handleAccountsChanged = (accounts: string[]) => {
       if (accounts.length === 0) {
         setAccount(null);
@@ -127,7 +97,7 @@ const App: React.FC = () => {
         window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
       }
     };
-  }, [checkWalletConnection, checkSubscriptionAndOnboarding]);
+  }, [checkSubscriptionAndOnboarding]);
   
   const connectWallet = async () => {
     if (!window.ethereum) {
