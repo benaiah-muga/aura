@@ -1,6 +1,6 @@
 
 import React, { useRef, useEffect } from 'react';
-import { ChatMessage, MessageAuthor } from '../../types';
+import { ChatMessage, MessageAuthor } from '../types';
 import { XIcon } from './icons/XIcon';
 import { CompanionAvatar } from './CompanionAvatar';
 
