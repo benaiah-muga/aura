@@ -5,15 +5,17 @@ import { SpinnerIcon } from '../icons/SpinnerIcon';
 import { POLYGON_AMOY_CURRENCY_SYMBOL, SUBSCRIPTION_PRICE_POL } from '../../constants';
 import { CreditCardIcon } from '../icons/CreditCardIcon';
 
+type AccessStatus = 'none' | 'trial' | 'active';
+
 interface SubscriptionPageProps {
   onSubscribe: () => void;
   isLoading: boolean;
   companion: 'Luna' | 'Orion';
-  isSubscriptionActive: boolean;
+  accessStatus: AccessStatus;
   subscriptionStatus: string;
 }
 
-const SubscribeCard: React.FC<Omit<SubscriptionPageProps, 'isSubscriptionActive' | 'subscriptionStatus'>> = ({ onSubscribe, isLoading, companion }) => {
+const SubscribeCard: React.FC<Omit<SubscriptionPageProps, 'accessStatus' | 'subscriptionStatus'>> = ({ onSubscribe, isLoading, companion }) => {
     const features = [
         "Unlimited AI chat",
         "Advanced mood tracking",
@@ -34,7 +36,7 @@ const SubscribeCard: React.FC<Omit<SubscriptionPageProps, 'isSubscriptionActive'
                 </div>
             </div>
             <div className="p-8 text-left">
-                <h2 className="text-3xl font-bold text-brand-dark-text mb-2">Unlock Your AI Mental Health Companion</h2>
+                <h2 className="text-3xl font-bold text-brand-dark-text mb-2">Unlock Your AI Companion</h2>
                 <p className="text-brand-dark-subtext mb-6">{SUBSCRIPTION_PRICE_POL} {POLYGON_AMOY_CURRENCY_SYMBOL} / month</p>
                 <ul className="space-y-3 mb-8">
                     {features.map((feature, index) => (
@@ -58,7 +60,6 @@ const SubscribeCard: React.FC<Omit<SubscriptionPageProps, 'isSubscriptionActive'
                         <span>Subscribe Now</span>
                     )}
                 </button>
-                 <p className="text-xs text-center text-brand-dark-subtext mt-4">Your trial has ended. Subscribe to continue your journey.</p>
             </div>
         </div>
     );
@@ -82,23 +83,39 @@ const StatusCard: React.FC<{ subscriptionStatus: string }> = ({ subscriptionStat
 
 
 export const SubscriptionPage: React.FC<SubscriptionPageProps> = (props) => {
+    const { accessStatus, subscriptionStatus } = props;
+
     return (
         <div className="p-4 sm:p-8 animate-fade-in-up flex-1 flex flex-col items-center justify-center">
-            {!props.isSubscriptionActive ? (
-                 <>
+            {accessStatus === 'none' && (
+                 <div className="flex flex-col items-center justify-center">
                     <header className="text-center mb-8">
                         <h1 className="text-3xl md:text-4xl font-bold text-brand-dark-text">Your Access Has Expired</h1>
                         <p className="text-brand-dark-subtext mt-2">Please subscribe to continue your journey with us.</p>
                     </header>
                     <SubscribeCard {...props} />
-                </>
-            ) : (
-                <>
+                </div>
+            )}
+            {accessStatus === 'trial' && (
+                <div className="flex flex-col items-center justify-center space-y-8">
+                    <header className="text-center">
+                        <h1 className="text-3xl md:text-4xl font-bold text-brand-dark-text">Subscription</h1>
+                        <p className="text-brand-dark-subtext mt-2">You are currently on a free trial.</p>
+                    </header>
+                    <StatusCard subscriptionStatus={subscriptionStatus} />
+                    <div className="w-full max-w-sm pt-8">
+                        <h2 className="text-2xl font-bold text-center text-brand-dark-text mb-4">Ready to Upgrade?</h2>
+                        <SubscribeCard {...props} />
+                    </div>
+                </div>
+            )}
+            {accessStatus === 'active' && (
+                <div className="flex flex-col items-center justify-center">
                     <header className="text-center mb-8">
                         <h1 className="text-3xl md:text-4xl font-bold text-brand-dark-text">Subscription</h1>
                     </header>
-                    <StatusCard subscriptionStatus={props.subscriptionStatus} />
-                </>
+                    <StatusCard subscriptionStatus={subscriptionStatus} />
+                </div>
             )}
         </div>
     );

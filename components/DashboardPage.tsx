@@ -253,7 +253,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ account, provider,
                             onSubscribe={handleSubscribe} 
                             isLoading={isSubscribing} 
                             companion={companion}
-                            isSubscriptionActive={isSubscriptionActive}
+                            accessStatus={accessStatus}
                             subscriptionStatus={subscriptionStatusText}
                         />;
             case 'settings':
