@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 import { HomeIcon } from './icons/HomeIcon';
@@ -204,6 +205,22 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ account, provider,
             setToast({ message: "Wallet not connected.", type: 'error' });
             return;
         }
+    
+        // Demo mode: If the user is paying themselves, simulate a successful transaction for demo purposes.
+        if (account.toLowerCase() === PAYMENT_RECIPIENT_ADDRESS.toLowerCase()) {
+            console.log("Entering demo mode: Simulating successful subscription.");
+            setIsSubscribing(true);
+            setTimeout(() => {
+                const thirtyDaysFromNow = new Date().getTime() + 30 * 24 * 60 * 60 * 1000;
+                localStorage.setItem(`solace_subscription_expiry_${account}`, thirtyDaysFromNow.toString());
+                localStorage.removeItem(`solace_trial_expiry_${account}`);
+                onSuccessfulSubscription();
+                setIsSubscribing(false);
+            }, 1500); // Simulate a 1.5-second transaction time.
+            return; 
+        }
+    
+        // Standard mode: Process a real transaction for all other users.
         setIsSubscribing(true);
         try {
             const signer = await provider.getSigner();
