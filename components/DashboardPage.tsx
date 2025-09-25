@@ -12,13 +12,13 @@ import { APP_NAME, PAYMENT_RECIPIENT_ADDRESS, SUBSCRIPTION_PRICE_POL } from '../
 import { OnboardingData } from './OnboardingPage';
 import { ChatInterface } from './pages/ChatPage';
 import { HomePage } from './pages/HomePage';
-import { MoodPage } from './pages/MoodPage';
+import { JournalPage } from './pages/JournalPage';
 import { SubscriptionPage } from './pages/SubscriptionPage';
 import { Toast } from './Toast';
 import { SettingsPage } from './pages/SettingsPage';
 import { CreditCardIcon } from './icons/CreditCardIcon';
 
-type DashboardView = 'home' | 'chat' | 'mood' | 'settings' | 'subscription';
+type DashboardView = 'home' | 'chat' | 'journal' | 'settings' | 'subscription';
 type ToastState = { message: string; type: 'success' | 'error' } | null;
 type AccessStatus = 'none' | 'trial' | 'active';
 
@@ -158,7 +158,7 @@ const Sidebar: React.FC<{
                 <div className="space-y-2">
                     <NavItem view="home" icon={<HomeIcon className="w-6 h-6"/>} label="Home" />
                     <NavItem view="chat" icon={<ChatBubbleIcon className="w-6 h-6"/>} label="Chat" />
-                    <NavItem view="mood" icon={<BookOpenIcon className="w-6 h-6"/>} label="Mood Tracking" />
+                    <NavItem view="journal" icon={<BookOpenIcon className="w-6 h-6"/>} label="Journal" />
                     <NavItem view="subscription" icon={<CreditCardIcon className="w-6 h-6"/>} label="Subscription" />
                     <NavItem view="settings" icon={<CogIcon className="w-6 h-6"/>} label="Settings" />
                 </div>
@@ -253,7 +253,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ account, provider,
                             userName={userName}
                             companion={companion}
                             subscriptionStatus={subscriptionStatusText}
-                            onNavigateToMood={() => setActiveView('mood')}
+                            onNavigateToJournal={() => setActiveView('journal')}
                             onNavigateToChat={() => setActiveView('chat')}
                         />;
             case 'chat':
@@ -263,8 +263,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ account, provider,
                             account={account} 
                             companionConfig={companions[companion]}
                         />;
-            case 'mood':
-                return <MoodPage />;
+            case 'journal':
+                return <JournalPage account={account} />;
             case 'subscription':
                 return <SubscriptionPage 
                             onSubscribe={handleSubscribe} 
@@ -286,7 +286,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ account, provider,
                             userName={userName}
                             companion={companion}
                             subscriptionStatus={subscriptionStatusText}
-                            onNavigateToMood={() => setActiveView('mood')}
+                            onNavigateToJournal={() => setActiveView('journal')}
                             onNavigateToChat={() => setActiveView('chat')}
                         />;
         }

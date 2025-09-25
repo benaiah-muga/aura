@@ -9,7 +9,7 @@ interface HomePageProps {
     userName: string;
     companion: 'Luna' | 'Orion';
     subscriptionStatus: string;
-    onNavigateToMood: () => void;
+    onNavigateToJournal: () => void;
     onNavigateToChat: () => void;
 }
 
@@ -28,7 +28,7 @@ const WellnessStatCard: React.FC<{ title: string; value: string; change: string;
     </div>
 );
 
-export const HomePage: React.FC<HomePageProps> = ({ userName, companion, subscriptionStatus, onNavigateToMood, onNavigateToChat }) => {
+export const HomePage: React.FC<HomePageProps> = ({ userName, companion, subscriptionStatus, onNavigateToJournal, onNavigateToChat }) => {
     
     return (
         <div className="p-4 sm:p-8 animate-fade-in-up flex-1">
@@ -42,7 +42,7 @@ export const HomePage: React.FC<HomePageProps> = ({ userName, companion, subscri
 
             <section className="mb-10">
                 <button 
-                    onClick={onNavigateToMood}
+                    onClick={onNavigateToJournal}
                     className="w-full text-left bg-brand-dark-primary text-white font-bold py-4 px-6 rounded-lg shadow-lg hover:bg-brand-dark-secondary transition-colors duration-300 transform hover:scale-[1.02]"
                 >
                     Daily Check-in

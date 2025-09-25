@@ -36,6 +36,7 @@
                 'spin-slow': 'spin 15s linear infinite',
                 'slide-in-from-right': 'slide-in-from-right 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards',
                 'glow': 'glow 2s ease-in-out infinite alternate',
+                'blink': 'blink 1s step-end infinite',
             },
             keyframes: {
                 'fade-in-up': {
@@ -53,6 +54,10 @@
                 'glow': {
                     '0%': { 'box-shadow': '0 0 5px -2px #8B5CF6' },
                     '100%': { 'box-shadow': '0 0 15px 3px #8B5CF6' },
+                },
+                'blink': {
+                    'from, to': { opacity: '1' },
+                    '50%': { opacity: '0' },
                 },
             }
           }

@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { streamAIResponse } from '../../services/geminiService';
 import { uploadChatHistory } from '../../services/web3storageService';
@@ -7,6 +6,10 @@ import { SpinnerIcon } from '../icons/SpinnerIcon';
 import { Toast } from '../Toast';
 import { UserProfile } from './UserProfile';
 import { AiProfile } from './AiProfile';
+import { EmojiPicker } from '../EmojiPicker';
+import { EmojiHappyIcon } from '../icons/EmojiHappyIcon';
+import { SendIcon } from '../icons/SendIcon';
+import { CompanionAvatar } from '../CompanionAvatar';
 
 interface ChatInterfaceProps {
   account: string;
@@ -23,32 +26,16 @@ interface ChatInterfaceProps {
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 type ToastState = { message: string; type: 'success' | 'error' } | null;
 
-const TypingIndicator: React.FC = () => (
-    <div className="flex items-center space-x-1.5 ml-4">
-      <div className="w-2 h-2 bg-brand-secondary rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
-      <div className="w-2 h-2 bg-brand-secondary rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-      <div className="w-2 h-2 bg-brand-secondary rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
-    </div>
-);
-
-const CompanionAvatar: React.FC<{ name: string, className?: string }> = ({ name, className = "w-8 h-8" }) => {
-    const initial = name ? name.charAt(0).toUpperCase() : 'A';
-    const sizeClasses = className.includes('w-10') ? 'text-xl' : 'text-sm';
-    return (
-        <div className={`relative inline-flex items-center justify-center overflow-hidden bg-brand-purple rounded-full flex-shrink-0 ${className}`}>
-            <span className={`font-medium text-white ${sizeClasses}`}>{initial}</span>
-        </div>
-    );
-};
-
 export const ChatInterface: React.FC<ChatInterfaceProps> = ({ account, companion, userName, companionConfig }) => {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const [isAiTyping, setIsAiTyping] = useState(false);
     const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
     const [toast, setToast] = useState<ToastState>(null);
+    const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
     
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const chatFooterRef = useRef<HTMLFormElement>(null);
     const chatHistoryKey = `solace_chat_history_${account}_${companion}`;
   
     const scrollToBottom = () => {
@@ -76,6 +63,19 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ account, companion
         localStorage.setItem(chatHistoryKey, JSON.stringify(messages));
       }
     }, [messages, chatHistoryKey]);
+
+    // Effect to close emoji picker on outside click
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (chatFooterRef.current && !chatFooterRef.current.contains(event.target as Node)) {
+                setIsEmojiPickerOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
   
     const getAiResponse = useCallback(async (history: ChatMessage[], newMessage: string) => {
       setIsAiTyping(true);
@@ -90,9 +90,16 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ account, companion
   
       await streamAIResponse(history, newMessage, (chunk) => {
           aiResponse += chunk;
-          setMessages(prev => prev.map((msg, index) => 
-              index === prev.length - 1 ? { ...msg, text: aiResponse } : msg
-          ));
+          setMessages(prev => {
+              const newMessages = [...prev];
+              if (newMessages.length > 0) {
+                  newMessages[newMessages.length - 1] = {
+                      ...newMessages[newMessages.length - 1],
+                      text: aiResponse
+                  };
+              }
+              return newMessages;
+          });
       }, instruction);
       
       setIsAiTyping(false);
@@ -101,6 +108,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ account, companion
     const handleSendMessage = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!input.trim() || isAiTyping) return;
+      setIsEmojiPickerOpen(false);
       const historyToSend = messages.slice();
       // If only the welcome message exists, send an empty history to the AI
       if (historyToSend.length === 1 && historyToSend[0].author === MessageAuthor.AI) {
@@ -115,14 +123,33 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ account, companion
       setSaveStatus('saving');
       const cid = await uploadChatHistory(messages);
       if (cid) {
-        setSaveStatus('saved');
-        setToast({ message: `Chat saved! CID: ${cid.substring(0,10)}...`, type: 'success'});
-        setTimeout(() => setSaveStatus('idle'), 3000);
+          const savedChatsKey = `solace_saved_chats_${account}`;
+          const savedChats = JSON.parse(localStorage.getItem(savedChatsKey) || '[]');
+          
+          const firstUserMessage = messages.find(m => m.author === MessageAuthor.USER);
+
+          const newEntry = {
+              cid,
+              timestamp: new Date().getTime(),
+              preview: firstUserMessage ? firstUserMessage.text.substring(0, 50) + '...' : 'Conversation with ' + companionConfig.name,
+              companionName: companionConfig.name,
+          };
+          
+          savedChats.unshift(newEntry);
+          localStorage.setItem(savedChatsKey, JSON.stringify(savedChats));
+
+          setSaveStatus('saved');
+          setToast({ message: 'Chat saved to your journal!', type: 'success'});
+          setTimeout(() => setSaveStatus('idle'), 3000);
       } else {
-        setSaveStatus('error');
-        setToast({ message: 'Failed to save chat history.', type: 'error' });
-        setTimeout(() => setSaveStatus('idle'), 3000);
+          setSaveStatus('error');
+          setToast({ message: 'Failed to save chat history.', type: 'error' });
+          setTimeout(() => setSaveStatus('idle'), 3000);
       }
+    };
+
+    const handleEmojiSelect = (emoji: string) => {
+        setInput(prev => prev + emoji);
     };
 
     return (
@@ -164,43 +191,48 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ account, companion
                                 : 'bg-brand-dark-bg-secondary text-brand-dark-text rounded-bl-none'
                             }`}
                         >
-                            <p className="whitespace-pre-wrap">{message.text}</p>
+                            <p className="whitespace-pre-wrap">
+                                {message.text}
+                                {message.author === MessageAuthor.AI && isAiTyping && index === messages.length - 1 && (
+                                    <span className="animate-blink font-light">|</span>
+                                )}
+                            </p>
                         </div>
                         </div>
                     ))}
-                    {isAiTyping && (
-                        <div className="flex items-end gap-3 justify-start">
-                         <CompanionAvatar name={companionConfig.name} />
-                        <div className="bg-brand-dark-bg-secondary p-4 rounded-2xl shadow-sm rounded-bl-none">
-                            <TypingIndicator />
-                        </div>
-                        </div>
-                    )}
                     <div ref={messagesEndRef} />
                     </div>
                 </main>
     
                 <footer className="bg-brand-dark-bg/80 backdrop-blur-md p-4 border-t border-white/10 rounded-b-2xl">
-                    <form onSubmit={handleSendMessage} className="max-w-3xl mx-auto">
-                    <div className="flex items-center bg-brand-dark-bg-secondary border border-gray-700 rounded-full shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-brand-purple transition-all">
-                        <input
-                        type="text"
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        placeholder="Type your message here..."
-                        className="w-full p-4 bg-transparent border-none focus:ring-0 text-brand-dark-text"
-                        disabled={isAiTyping}
-                        />
-                        <button
-                        type="submit"
-                        disabled={!input.trim() || isAiTyping}
-                        className="bg-brand-purple text-white rounded-full w-10 h-10 m-2 flex-shrink-0 flex items-center justify-center hover:bg-brand-purple/80 transition-colors disabled:bg-gray-500"
-                        >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
-                        </svg>
-                        </button>
-                    </div>
+                    <form onSubmit={handleSendMessage} ref={chatFooterRef} className="max-w-3xl mx-auto relative">
+                        {isEmojiPickerOpen && <EmojiPicker onEmojiSelect={handleEmojiSelect} />}
+                        <div className="flex items-center bg-brand-dark-bg-secondary border border-gray-700 rounded-full shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-brand-purple transition-all">
+                            <input
+                                type="text"
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                placeholder="Type your message here..."
+                                className="w-full p-4 bg-transparent border-none focus:ring-0 text-brand-dark-text"
+                                disabled={isAiTyping}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setIsEmojiPickerOpen(!isEmojiPickerOpen)}
+                                className="text-brand-dark-subtext hover:text-brand-dark-text p-2 transition-colors"
+                                aria-label="Open emoji picker"
+                            >
+                                <EmojiHappyIcon className="w-6 h-6" />
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={!input.trim() || isAiTyping}
+                                className="bg-brand-purple text-white rounded-full w-10 h-10 m-2 flex-shrink-0 flex items-center justify-center hover:bg-brand-purple/80 transition-colors disabled:bg-gray-500"
+                                aria-label="Send message"
+                            >
+                                <SendIcon className="h-5 w-5" />
+                            </button>
+                        </div>
                     </form>
                 </footer>
             </div>
