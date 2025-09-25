@@ -111,7 +111,7 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
       case 1:
         return (
           <div key={1} className="animate-slide-in-from-right">
-            <h2 className="text-3xl font-bold text-brand-dark-text mb-2">Welcome to AURA</h2>
+            <h2 className="text-3xl font-bold text-brand-dark-text mb-2">Welcome to Solace</h2>
             <p className="text-brand-dark-subtext mb-8">Let's start by getting to know you a little better.</p>
             <label htmlFor="name" className="block text-lg font-medium text-brand-dark-subtext mb-2">What should we call you?</label>
             <input
@@ -265,7 +265,7 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
                         type="submit"
                         className="bg-brand-dark-primary text-white font-bold py-3 px-8 rounded-full shadow-lg hover:bg-brand-dark-secondary transition-all duration-300 transform hover:scale-105 animate-subtle-pulse"
                     >
-                        Enter AURA
+                        Enter Solace
                     </button>
                 )}
                 </div>

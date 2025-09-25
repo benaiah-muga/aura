@@ -54,7 +54,7 @@ const App: React.FC = () => {
 
   // Safely parse and validate data from localStorage
   const loadAndValidateOnboardingData = (userAddress: string): OnboardingData | null => {
-    const storedData = localStorage.getItem(`aura_onboarding_data_${userAddress}`);
+    const storedData = localStorage.getItem(`solace_onboarding_data_${userAddress}`);
     if (!storedData) return null;
 
     try {
@@ -63,10 +63,10 @@ const App: React.FC = () => {
             return parsedData;
         }
         console.warn("Invalid onboarding data found in localStorage. Forcing re-onboarding.");
-        localStorage.removeItem(`aura_onboarding_data_${userAddress}`); // Clean up bad data
+        localStorage.removeItem(`solace_onboarding_data_${userAddress}`); // Clean up bad data
     } catch (error) {
         console.error("Failed to parse onboarding data from localStorage:", error);
-        localStorage.removeItem(`aura_onboarding_data_${userAddress}`); // Clean up bad data
+        localStorage.removeItem(`solace_onboarding_data_${userAddress}`); // Clean up bad data
     }
     return null;
   };
@@ -74,8 +74,8 @@ const App: React.FC = () => {
   const checkAccessStatus = useCallback((userAddress: string) => {
     setIsLoading(true); // Show a brief loading state for a smoother transition
 
-    const subExpiry = localStorage.getItem(`aura_subscription_expiry_${userAddress}`);
-    const trialExpiry = localStorage.getItem(`aura_trial_expiry_${userAddress}`);
+    const subExpiry = localStorage.getItem(`solace_subscription_expiry_${userAddress}`);
+    const trialExpiry = localStorage.getItem(`solace_trial_expiry_${userAddress}`);
     let hasAccess = false;
 
     // 1. Check for an active subscription
@@ -92,7 +92,7 @@ const App: React.FC = () => {
     else if (!trialExpiry) {
         console.log("No active subscription or trial. Starting a new 3-day trial.");
         const newTrialExpiry = new Date().getTime() + TRIAL_DURATION_MS;
-        localStorage.setItem(`aura_trial_expiry_${userAddress}`, newTrialExpiry.toString());
+        localStorage.setItem(`solace_trial_expiry_${userAddress}`, newTrialExpiry.toString());
         setToast({ message: "Welcome! Your 3-day free trial has started.", type: 'success' });
         hasAccess = true;
     } else {
@@ -211,7 +211,7 @@ const App: React.FC = () => {
 
   const handleOnboardingComplete = (data: OnboardingData) => {
     if (!account) return;
-    localStorage.setItem(`aura_onboarding_data_${account}`, JSON.stringify(data));
+    localStorage.setItem(`solace_onboarding_data_${account}`, JSON.stringify(data));
     setOnboardingData(data);
     setView('dashboard');
     setToast({ message: "Setup complete. Welcome to your safe space.", type: 'success' });
@@ -271,7 +271,7 @@ const App: React.FC = () => {
         <div className="container mx-auto mt-24 md:mt-32 text-center">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">A Sanctuary for Your Mind</h2>
             <p className="text-lg text-brand-dark-subtext max-w-3xl mx-auto mb-12">
-                AURA provides the tools you need in a secure, decentralized environment.
+                {APP_NAME} provides the tools you need in a secure, decentralized environment.
             </p>
             <div className="grid md:grid-cols-3 gap-8">
                 <FeatureCard

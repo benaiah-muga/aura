@@ -49,7 +49,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ account, companion
     const [toast, setToast] = useState<ToastState>(null);
     
     const messagesEndRef = useRef<HTMLDivElement>(null);
-    const chatHistoryKey = `aura_chat_history_${account}_${companion}`;
+    const chatHistoryKey = `solace_chat_history_${account}_${companion}`;
   
     const scrollToBottom = () => {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

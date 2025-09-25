@@ -95,7 +95,7 @@ export const MoodPage: React.FC = () => {
             date: new Date().toISOString(),
         };
 
-        const key = `aura_mood_history_${account}`;
+        const key = `solace_mood_history_${account}`;
         const history = JSON.parse(localStorage.getItem(key) || '[]');
         history.push(newEntry);
         localStorage.setItem(key, JSON.stringify(history));

@@ -26,7 +26,7 @@ export const uploadChatHistory = async (messages: ChatMessage[]): Promise<string
             messages: messages,
         }, null, 2);
 
-        const fileName = `aura-chat-${new Date().getTime()}.json`;
+        const fileName = `solace-chat-${new Date().getTime()}.json`;
 
         // Using lighthouse.uploadText is simpler and more direct for string data
         const response = await lighthouse.uploadText(

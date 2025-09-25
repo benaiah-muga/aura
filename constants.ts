@@ -13,4 +13,4 @@ export const TRIAL_DURATION_MS = 3 * 24 * 60 * 60 * 1000; // 3 days in milliseco
 export const GEMINI_MODEL_NAME = 'gemini-2.5-flash';
 
 // UI and Branding
-export const APP_NAME = 'AURA';
+export const APP_NAME = 'Solace';
