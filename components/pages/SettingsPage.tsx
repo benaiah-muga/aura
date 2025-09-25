@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { UserCircleIcon } from '../icons/UserCircleIcon';
 import { BellIcon } from '../icons/BellIcon';
@@ -11,6 +12,7 @@ interface SettingsPageProps {
     account: string;
     companionName: string;
     subscriptionStatus: string;
+    onNavigateToSubscription: () => void;
 }
 
 const SettingsCard: React.FC<{
@@ -53,7 +55,7 @@ const Toggle: React.FC<{ label: string; enabled: boolean; onToggle: () => void; 
 );
 
 
-export const SettingsPage: React.FC<SettingsPageProps> = ({ userName, account, companionName, subscriptionStatus }) => {
+export const SettingsPage: React.FC<SettingsPageProps> = ({ userName, account, companionName, subscriptionStatus, onNavigateToSubscription }) => {
     // Placeholder states for toggles
     const [pushEnabled, setPushEnabled] = React.useState(true);
     const [emailEnabled, setEmailEnabled] = React.useState(false);
@@ -80,7 +82,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ userName, account, c
                 {/* Subscription Settings */}
                 <SettingsCard icon={<CreditCardIcon />} title="Subscription">
                     <SettingRow label="Current Plan" value={subscriptionStatus}>
-                        <button className="text-sm font-semibold text-brand-dark-primary hover:underline">Manage</button>
+                        <button onClick={onNavigateToSubscription} className="text-sm font-semibold text-brand-dark-primary hover:underline">Manage</button>
                     </SettingRow>
                 </SettingsCard>
 

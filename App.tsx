@@ -14,6 +14,7 @@ import { DashboardPage } from './components/DashboardPage';
 
 type View = 'landing' | 'connected' | 'onboarding' | 'dashboard';
 type ToastState = { message: string; type: 'success' | 'error' } | null;
+type AccessStatus = 'none' | 'trial' | 'active';
 
 const FeatureCard: React.FC<{icon: React.ReactNode, title: string, description: string}> = ({ icon, title, description }) => (
     <div className="bg-brand-dark-bg-secondary p-6 rounded-xl border border-white/10 text-center flex flex-col items-center transform transition-transform duration-300 hover:-translate-y-2">
@@ -50,7 +51,7 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [toast, setToast] = useState<ToastState>(null);
   const [onboardingData, setOnboardingData] = useState<OnboardingData | null>(null);
-  const [isSubscriptionActive, setIsSubscriptionActive] = useState(false);
+  const [accessStatus, setAccessStatus] = useState<AccessStatus>('none');
 
   // Safely parse and validate data from localStorage
   const loadAndValidateOnboardingData = (userAddress: string): OnboardingData | null => {
@@ -72,35 +73,39 @@ const App: React.FC = () => {
   };
 
   const checkAccessStatus = useCallback((userAddress: string) => {
-    setIsLoading(true); // Show a brief loading state for a smoother transition
+    setIsLoading(true);
 
     const subExpiry = localStorage.getItem(`solace_subscription_expiry_${userAddress}`);
     const trialExpiry = localStorage.getItem(`solace_trial_expiry_${userAddress}`);
-    let hasAccess = false;
+    
+    const now = new Date().getTime();
+    const subExpiryTime = subExpiry ? parseInt(subExpiry, 10) : 0;
+    const trialExpiryTime = trialExpiry ? parseInt(trialExpiry, 10) : 0;
 
-    // 1. Check for an active subscription
-    if (subExpiry && new Date().getTime() < parseInt(subExpiry, 10)) {
-        console.log("Active subscription found.");
-        hasAccess = true;
-    }
-    // 2. Check for an active trial
-    else if (trialExpiry && new Date().getTime() < parseInt(trialExpiry, 10)) {
-        console.log("Active trial found.");
-        hasAccess = true;
-    }
-    // 3. New user or expired user -> Start a new trial if no trial has ever been set
-    else if (!trialExpiry) {
-        console.log("No active subscription or trial. Starting a new 3-day trial.");
-        const newTrialExpiry = new Date().getTime() + TRIAL_DURATION_MS;
+    const hasActiveSubscription = subExpiryTime > now;
+    const hasActiveTrial = trialExpiryTime > now;
+    const hasEverHadTrial = !!trialExpiry;
+
+    let newAccessStatus: AccessStatus = 'none';
+
+    if (hasActiveSubscription) {
+        console.log("Access granted: Active subscription.");
+        newAccessStatus = 'active';
+    } else if (hasActiveTrial) {
+        console.log("Access granted: Active trial.");
+        newAccessStatus = 'trial';
+    } else if (!hasEverHadTrial) {
+        console.log("No active access. Starting a new 3-day trial for new user.");
+        const newTrialExpiry = now + TRIAL_DURATION_MS;
         localStorage.setItem(`solace_trial_expiry_${userAddress}`, newTrialExpiry.toString());
         setToast({ message: "Welcome! Your 3-day free trial has started.", type: 'success' });
-        hasAccess = true;
+        newAccessStatus = 'trial';
     } else {
-        console.log("Subscription and trial have expired.");
-        hasAccess = false;
+        console.log("Access denied: Subscription and trial have expired.");
+        newAccessStatus = 'none';
     }
     
-    setIsSubscriptionActive(hasAccess);
+    setAccessStatus(newAccessStatus);
 
     const loadedData = loadAndValidateOnboardingData(userAddress);
     if (loadedData) {
@@ -314,7 +319,7 @@ const App: React.FC = () => {
                         account={account}
                         provider={provider}
                         onboardingData={onboardingData}
-                        isSubscriptionActive={isSubscriptionActive}
+                        accessStatus={accessStatus}
                         onSuccessfulSubscription={handleSuccessfulSubscription}
                     />
                 );

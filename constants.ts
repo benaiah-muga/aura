@@ -5,7 +5,7 @@ export const POLYGON_AMOY_NETWORK_NAME = 'Polygon Amoy';
 export const POLYGON_AMOY_CURRENCY_SYMBOL = 'POL'; // Updated from MATIC
 
 // Subscription and Trial Configuration
-export const SUBSCRIPTION_PRICE_POL = '0.02'; // Monthly subscription price in POL
+export const SUBSCRIPTION_PRICE_POL = '0.01'; // Monthly subscription price in POL
 export const PAYMENT_RECIPIENT_ADDRESS = '0x8888888888888888888888888888888888888888'; // Placeholder address
 export const TRIAL_DURATION_MS = 3 * 24 * 60 * 60 * 1000; // 3 days in milliseconds
 

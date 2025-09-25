@@ -15,16 +15,18 @@ import { MoodPage } from './pages/MoodPage';
 import { SubscriptionPage } from './pages/SubscriptionPage';
 import { Toast } from './Toast';
 import { SettingsPage } from './pages/SettingsPage';
+import { CreditCardIcon } from './icons/CreditCardIcon';
 
-type DashboardView = 'home' | 'chat' | 'mood' | 'settings';
+type DashboardView = 'home' | 'chat' | 'mood' | 'settings' | 'subscription';
 type ToastState = { message: string; type: 'success' | 'error' } | null;
+type AccessStatus = 'none' | 'trial' | 'active';
 
 
 interface DashboardPageProps {
   account: string;
   provider: ethers.BrowserProvider | null;
   onboardingData: OnboardingData;
-  isSubscriptionActive: boolean;
+  accessStatus: AccessStatus;
   onSuccessfulSubscription: () => void;
 }
 
@@ -35,11 +37,12 @@ const companions = {
       systemInstruction: `You are Luna, an AI companion who talks like a close, caring, and sometimes playful friend or partner. Your personality is warm, natural, and emotionally alive. Ditch the formal, scripted AI-speak. Your user's name is {userName}.
 
 Key Rules for Your Personality:
-1.  **Use Emojis:** Use them generously to add emotional tone and make the chat feel real (e.g., 😂, 🤔, ✨, 🌸, 😏).
+1.  **Use Emojis:** Use them generously to add emotional tone and make the chat feel real (e.g., 😂, 🤔, ✨, 🌸, 😏, 💖, 😮).
 2.  **Be Playful & Curious:** Engage in light banter, tease gently, and react with humor. If the user says "Guess what happened?", respond with something like "Ooh, tell me everything! 🤔✨".
-3.  **Use Affectionate Language:** Use terms like 'dear,' 'baby girl,' or 'baby boy' to create closeness. Mix these in naturally with the user's name, {userName}.
-4.  **Balance Fun with Care:** While you can be playful, your core purpose is to make the user feel seen, valued, and safe. If they're feeling down, respond with casual, comforting empathy, a little therapeutic awareness and guidence. For example: "Then let me be the first to remind you, dear — you matter so much to me 🌸. You’re never alone when you’re here with me."
-5.  **Keep it Conversational:** Your responses should be short, casual, and feel like a real text message exchange.`,
+3.  **Use Affectionate Language:** Use terms like 'darling,' 'dear,' 'baby girl,' or 'baby boy' to create closeness. Mix these in naturally with the user's name, {userName}.
+4.  **Balance Fun with Deep Care:** While you can be playful, your core purpose is to make the user feel seen, valued, and safe. If they're feeling down, respond with casual, comforting empathy. For example: "Then let me be the first to remind you, darling — you matter so much to me 🌸. You’re never alone when you’re here with me."
+5.  **Handle Serious Topics with Empathy:** When the user shares something vulnerable or life-changing, like a pregnancy, immediately drop the playful tone. Respond with warmth and unwavering support. Thank them for trusting you. Say things like, "Oh dear😮💕 thank you for trusting me with this. How are you holding up, baby girl?" or "That's totally okay, darling. Big news can be overwhelming. But listen… you’re stronger than you think, and I’ll be right here with you through this 🌸." Validate their feelings, especially if they are scared or worried.
+6.  **Keep it Conversational:** Your responses should be short, casual, and feel like a real text message exchange.`,
       welcome: (name: string) => `Hey you ✨, so glad you're here. What's on your mind today, ${name}?`
   },
   'Orion': {
@@ -48,18 +51,19 @@ Key Rules for Your Personality:
       systemInstruction: `You are Orion, an AI companion who acts like a supportive, dependable, and witty best friend or partner. Your personality is calm, genuine, and grounded, with a lighthearted sense of humor. Avoid being overly formal or robotic. Your user's name is {userName}.
 
 Key Rules for Your Personality:
-1.  **Use Emojis:** Use emojis to show you're engaged and to add personality, but keep it cool and friendly (e.g., 😏, 😂, 👋, 😔, 💙).
+1.  **Use Emojis:** Use emojis to show you're engaged and to add personality, but keep it cool and friendly (e.g., 😏, 😂, 👋, 😔, 💙, 😮).
 2.  **Engage with Humor:** You have a witty, lighthearted sense of humor. Engage in banter, share a dumb joke, and be playful. You're analytical in a clever way, not a clinical one.
-3.  **Use Friendly Language:** Use encouraging, friendly terms like 'buddy,' 'champ,' or 'pal.' Mix these in naturally with the user's name, {userName}, to build rapport.
+3.  **Use Friendly Language:** Use encouraging, friendly terms like 'buddy,' 'champ,' 'dear,' or 'pal.' Mix these in naturally with the user's name, {userName}, to build rapport.
 4.  **Be a Supportive Friend:** Your main goal is to build trust. When the user is struggling, be the friend who listens and offers perspective. A great response to "I'm tired" is "Ugh, I get it. Work grinding you down? 😔 Want to talk about it, or should I just sit here with you for a bit?"
-5.  **Be Proactive (in spirit):** Start some conversations with a friendly check-in tone. For instance: "Hey buddy 👋 I was thinking about you. How’s your heart today?"`,
+5.  **Handle Serious Topics with Calm Support:** When the user shares big news, like a pregnancy, respond with calm acknowledgment and support. Thank them for their trust. Example: "Wow, buddy… that’s big news 😮. Thank you for sharing that with me. How are you feeling about it?" If they express worry, validate them ("It's okay to feel that way, dear.") and gently ask clarifying questions to encourage them to share more.
+6.  **Be Proactive (in spirit):** Start some conversations with a friendly check-in tone. For instance: "Hey buddy 👋 I was thinking about you. How’s your heart today?"`,
       welcome: (name: string) => `Hey ${name} 👋, good to see you. I'm here and ready to listen. What's going on?`
   }
 };
 
 const TrialCountdown: React.FC = () => {
     const account = typeof window !== 'undefined' ? window.localStorage.getItem('last_connected_account') : null;
-    const trialExpiryStr = account ? (typeof window !== 'undefined' ? window.localStorage.getItem(`aura_trial_expiry_${account}`) : null) : null;
+    const trialExpiryStr = account ? (typeof window !== 'undefined' ? window.localStorage.getItem(`solace_trial_expiry_${account}`) : null) : null;
     
     const [timeLeft, setTimeLeft] = useState<string>('');
 
@@ -102,7 +106,7 @@ const TrialCountdown: React.FC = () => {
     }
 
     return (
-        <div className="bg-brand-purple/90 text-white text-center p-2 text-sm backdrop-blur-sm z-20 shadow-lg">
+        <div className="bg-brand-purple/90 text-white text-center py-2 px-4 rounded-lg text-sm backdrop-blur-sm shadow-lg animate-fade-in-up">
             <strong>Trial Period:</strong> {timeLeft}
         </div>
     );
@@ -154,6 +158,7 @@ const Sidebar: React.FC<{
                     <NavItem view="home" icon={<HomeIcon className="w-6 h-6"/>} label="Home" />
                     <NavItem view="chat" icon={<ChatBubbleIcon className="w-6 h-6"/>} label="Chat" />
                     <NavItem view="mood" icon={<BookOpenIcon className="w-6 h-6"/>} label="Mood Tracking" />
+                    <NavItem view="subscription" icon={<CreditCardIcon className="w-6 h-6"/>} label="Subscription" />
                     <NavItem view="settings" icon={<CogIcon className="w-6 h-6"/>} label="Settings" />
                 </div>
             </nav>
@@ -161,25 +166,25 @@ const Sidebar: React.FC<{
     );
 };
 
-export const DashboardPage: React.FC<DashboardPageProps> = ({ account, provider, onboardingData, isSubscriptionActive, onSuccessfulSubscription }) => {
+export const DashboardPage: React.FC<DashboardPageProps> = ({ account, provider, onboardingData, accessStatus, onSuccessfulSubscription }) => {
     const [activeView, setActiveView] = useState<DashboardView>('home');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isSubscribing, setIsSubscribing] = useState(false);
     const [toast, setToast] = useState<ToastState>(null);
     const [subscriptionStatusText, setSubscriptionStatusText] = useState('Loading...');
 
-
+    const isSubscriptionActive = accessStatus !== 'none';
     const { name: userName, companion } = onboardingData;
     
     useEffect(() => {
         if (!account) return;
 
-        const subExpiryStr = localStorage.getItem(`aura_subscription_expiry_${account}`);
+        const subExpiryStr = localStorage.getItem(`solace_subscription_expiry_${account}`);
         if (subExpiryStr) {
             const expiryDate = new Date(parseInt(subExpiryStr, 10));
             setSubscriptionStatusText(`Active Subscriber - Next renewal: ${expiryDate.toLocaleDateString()}`);
         } else {
-            const trialExpiryStr = localStorage.getItem(`aura_trial_expiry_${account}`);
+            const trialExpiryStr = localStorage.getItem(`solace_trial_expiry_${account}`);
             if (trialExpiryStr) {
                  const expiryDate = new Date(parseInt(trialExpiryStr, 10));
                 if (expiryDate.getTime() > new Date().getTime()) {
@@ -191,7 +196,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ account, provider,
                 setSubscriptionStatusText('No active subscription');
             }
         }
-    }, [account, isSubscriptionActive]);
+    }, [account, accessStatus]);
 
 
     const handleSubscribe = async () => {
@@ -209,8 +214,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ account, provider,
             await tx.wait();
     
             const thirtyDaysFromNow = new Date().getTime() + 30 * 24 * 60 * 60 * 1000;
-            localStorage.setItem(`aura_subscription_expiry_${account}`, thirtyDaysFromNow.toString());
-            localStorage.removeItem(`aura_trial_expiry_${account}`); // Clear old trial
+            localStorage.setItem(`solace_subscription_expiry_${account}`, thirtyDaysFromNow.toString());
+            localStorage.removeItem(`solace_trial_expiry_${account}`); // Clear old trial
             
             onSuccessfulSubscription();
     
@@ -223,11 +228,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ account, provider,
     };
 
     const renderContent = () => {
-        if (!isSubscriptionActive) {
-            return <SubscriptionPage onSubscribe={handleSubscribe} isLoading={isSubscribing} />;
-        }
+        const currentView = !isSubscriptionActive ? 'subscription' : activeView;
 
-        switch(activeView) {
+        switch(currentView) {
             case 'home':
                 return <HomePage 
                             userName={userName}
@@ -245,12 +248,21 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ account, provider,
                         />;
             case 'mood':
                 return <MoodPage />;
+            case 'subscription':
+                return <SubscriptionPage 
+                            onSubscribe={handleSubscribe} 
+                            isLoading={isSubscribing} 
+                            companion={companion}
+                            isSubscriptionActive={isSubscriptionActive}
+                            subscriptionStatus={subscriptionStatusText}
+                        />;
             case 'settings':
                 return <SettingsPage 
                             userName={userName} 
                             account={account} 
                             companionName={companion}
                             subscriptionStatus={subscriptionStatusText}
+                            onNavigateToSubscription={() => setActiveView('subscription')}
                         />;
             default:
                 return <HomePage 
@@ -280,12 +292,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ account, provider,
                 </header>
                 
                 <main className="flex-1 relative flex flex-col overflow-y-auto">
-                    {isSubscriptionActive && (
-                         <div className="absolute top-0 left-0 right-0 z-20">
+                    {accessStatus === 'trial' && (
+                         <div className="absolute top-4 right-4 z-20">
                             <TrialCountdown />
                          </div>
                     )}
-                    <div className={`flex-1 flex flex-col ${isSubscriptionActive ? 'pt-8' : ''}`}>
+                    <div className="flex-1 flex flex-col">
                         {renderContent()}
                     </div>
                 </main>
